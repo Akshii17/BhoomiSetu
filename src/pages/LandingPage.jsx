@@ -1,39 +1,52 @@
 import { useMemo, useRef, useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
-import { Landmark, LogIn, UserPlus, Mail, Lock, User, Building2, Search, Lock as LockIcon, ArrowRight, X, Sparkles, Ruler, Hexagon, Flame, SplitSquareHorizontal, RotateCcw, CircleDot, Send, Layers, FileText, Menu } from "lucide-react";
+import {
+  Landmark, LogIn, UserPlus, Mail, Lock, User, Building2, Search, Lock as LockIcon, ArrowRight, X, Sparkles,
+  Ruler, Hexagon, Flame, SplitSquareHorizontal, RotateCcw, CircleDot, Send, Layers, FileText, Menu, Download,
+  CheckCircle2, Flag, ShieldCheck, RefreshCw, BarChart3,
+} from "lucide-react";
 import { PieChart, Pie, Cell, BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer } from "recharts";
 import { ROLES, REGISTERABLE } from "../roles";
 import * as maplibregl from "maplibre-gl";
 import "maplibre-gl/dist/maplibre-gl.css";
-import { STUDIES, FACETS, REGIONS, HIGHWAYS, RAIL, MAP_LAYERS, BASEMAPS, baseStyle } from "../data/studies";
+import { STUDIES, FACETS, REGIONS, HIGHWAYS, RAIL, MAP_LAYERS, BASEMAPS, baseStyle } from "../data/Studies";
+
+import PublicDashboard from "../components/PublicDashboard";
+import InnovationPortal from "../components/InnovationPortal";
+import SystemFlowDiagram from "../components/SystemFlowDiagram";
+import ReportExportModal from "../components/ReportExportModal";
+import FeedbackModal from "../components/FeedbackModal";
 
 const G = "#1f3d2b", GOLD = "#b8923a", INK = "#26282b", LINEN = "#f4efe6";
 const serif = "font-['Newsreader',serif]";
 const go = (id) => document.getElementById(id)?.scrollIntoView({ behavior: "smooth", block: "start" });
 const ACCESS_STYLE = { Open: "bg-[#e3ecdf] text-[#1f3d2b]", Registered: "bg-[#f3e8c9] text-[#6b5216]", Restricted: "bg-[#ecd9d9] text-[#7a2a33]" };
 
-/* ---------------- Login / Register modal (existing demo logic kept) ---------------- */
-function AuthModal({ initial, onClose }) {
+/* ---------------- Login / Register modal ---------------- */
+function AuthModal({ initial, onClose, message = "" }) {
   const nav = useNavigate();
   const [tab, setTab] = useState(initial);
   const [err, setErr] = useState("");
   const [f, setF] = useState({ name: "", email: "", org: "", password: "", role: "researcher" });
   const set = (k) => (e) => setF({ ...f, [k]: e.target.value });
   useEffect(() => { const h = (e) => e.key === "Escape" && onClose(); window.addEventListener("keydown", h); return () => window.removeEventListener("keydown", h); }, [onClose]);
+
   function submit(e) {
     e.preventDefault();
     if (!f.email.trim() || !f.password.trim() || (tab === "register" && !f.name.trim())) return setErr("Fill in all required fields.");
-    nav(ROLES[f.role].path); // DEMO ONLY: straight to the chosen role's experience
+    localStorage.setItem("bhoomi_user", JSON.stringify({ name: f.name || f.email.split("@")[0], email: f.email, role: f.role }));
+    nav(ROLES[f.role].path);
   }
   const field = "w-full rounded-lg border border-stone-300 bg-white py-2.5 pl-10 pr-3 text-sm outline-none focus:border-[#1f3d2b] focus:ring-2 focus:ring-[#1f3d2b]/15";
   const Ic = ({ I }) => <I size={15} className="pointer-events-none absolute left-3.5 top-1/2 -translate-y-1/2 text-stone-400" />;
+
   return (
-    <div className="fixed inset-0 z-50 grid place-items-center bg-[#26282b]/60 p-4" onClick={onClose} role="dialog" aria-modal="true">
-      <div className="w-full max-w-md rounded-xl border-t-4 border-[#b8923a] bg-[#faf7f1] p-7 shadow-2xl" onClick={(e) => e.stopPropagation()}>
+    <div className="fixed inset-0 z-50 grid place-items-center bg-[#26282b]/60 p-4 backdrop-blur-sm" onClick={onClose} role="dialog" aria-modal="true">
+      <div className="w-full max-w-md rounded-2xl border-t-4 border-[#b8923a] bg-[#faf7f1] p-7 shadow-2xl" onClick={(e) => e.stopPropagation()}>
         <div className="flex items-start justify-between">
           <div>
             <h2 className={`${serif} text-2xl font-semibold text-[#1f3d2b]`}>{tab === "login" ? "Sign in to Bhoomi" : "Create your account"}</h2>
-            <p className="mt-1 text-sm text-stone-600">Analyse, generate insights and act in your role-specific workspace.</p>
+            <p className="mt-1 text-sm text-stone-600">{message || "Analyse, generate insights and act in your role-specific workspace."}</p>
           </div>
           <button onClick={onClose} aria-label="Close" className="rounded p-1 text-stone-500 hover:bg-stone-200"><X size={18} /></button>
         </div>
@@ -63,7 +76,7 @@ function AuthModal({ initial, onClose }) {
 }
 
 /* ---------------- Study Repository ---------------- */
-function Repository() {
+function Repository({ onPromptLogin }) {
   const nav = useNavigate();
   const [q, setQ] = useState("");
   const [sort, setSort] = useState("relevance");
@@ -80,6 +93,7 @@ function Repository() {
     return out.sort((a, b) => sort === "year" ? b.year - a.year : sort === "title" ? a.title.localeCompare(b.title) : b.score - a.score);
   }, [q, sel, sort]);
   const active = Object.values(sel).flat().length;
+
   return (
     <section id="repository" className="scroll-mt-16 bg-[#faf7f1] px-5 py-20">
       <div className="mx-auto max-w-7xl">
@@ -125,7 +139,19 @@ function Repository() {
                   <p className="mt-3 flex gap-2 rounded-lg bg-[#f4efe6] p-3 text-sm text-stone-700"><Sparkles size={15} className="mt-0.5 shrink-0 text-[#b8923a]" />{s.sum}</p>
                   <div className="mt-3 flex items-center justify-between">
                     <span className={`inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-xs font-medium ${ACCESS_STYLE[s.access]}`}>{s.access !== "Open" && <LockIcon size={11} />}{s.access}</span>
-                    <button onClick={() => nav(`/study/${s.id}`)} className="flex items-center gap-1.5 rounded-lg bg-[#1f3d2b] px-4 py-2 text-sm font-medium text-white hover:bg-[#2a5239]">View Study <ArrowRight size={14} /></button>
+                    <div className="flex items-center gap-2">
+                      {s.access !== "Open" ? (
+                        <button
+                          onClick={() => onPromptLogin(`Access to "${s.title}" (${s.access}) requires a verified institutional account.`)}
+                          className="flex items-center gap-1.5 rounded-lg border border-[#1f3d2b] bg-white px-3 py-2 text-xs font-semibold text-[#1f3d2b] hover:bg-[#1f3d2b]/10"
+                        >
+                          <LockIcon size={13} /> Restricted Access
+                        </button>
+                      ) : null}
+                      <button onClick={() => nav(`/study/${s.id}`)} className="flex items-center gap-1.5 rounded-lg bg-[#1f3d2b] px-4 py-2 text-sm font-medium text-white hover:bg-[#2a5239]">
+                        View Study <ArrowRight size={14} />
+                      </button>
+                    </div>
                   </div>
                 </li>
               ))}
@@ -156,7 +182,7 @@ const PROJ = fc(REGIONS.flatMap((r) => offs.slice(1, 2 + Math.round(r.m.proj / 4
 const REGION_FC = fc(REGIONS.map((r) => ({ type: "Feature", properties: { id: r.id, name: r.name, ...r.m }, geometry: { type: "Polygon", coordinates: [[...r.poly, r.poly[0]]] } })));
 const line = (c) => ({ type: "Feature", properties: {}, geometry: { type: "LineString", coordinates: c } });
 
-function GIS() {
+function GIS({ onPromptLogin }) {
   const nav = useNavigate();
   const box = useRef(null);
   const mapRef = useRef(null);
@@ -174,14 +200,13 @@ function GIS() {
   const [corridor, setCorridor] = useState(false);
   live.current = { tool, kmBuf };
   const flat = Object.values(MAP_LAYERS).flat();
-  const choro = ["agri", "urban", "forest", "flood", "heat", "disp", "proj"].find((k) => on.includes(k));
+  const choro = ["agri", "urban", "forest", "flood", "heat", "disp", "proj", "water", "pop"].find((k) => on.includes(k));
   const color = flat.find((l) => l[0] === choro)?.[2] || "#1f5a3a";
   const region = REGIONS.find((r) => r.id === sel);
   const t = (year - 2015) / 10;
   const dist = pts.length === 2 ? Math.round(hav(pts[0], pts[1])) : null;
   const areaKm = pts.length >= 3 ? Math.round(polyKm2(pts)) : null;
 
-  // create map once
   useEffect(() => {
     const map = new maplibregl.Map({ container: box.current, style: baseStyle(), ...HOME, minZoom: 3 });
     mapRef.current = map;
@@ -194,7 +219,7 @@ function GIS() {
       map.addLayer({ id: "regions-fill", type: "fill", source: "regions", paint: { "fill-color": "#1f5a3a", "fill-opacity": 0.1 } });
       map.addLayer({ id: "regions-line", type: "line", source: "regions", paint: { "line-color": "#f4efe6", "line-width": 1.5 } });
       map.addLayer({ id: "regions-hl", type: "line", source: "regions", filter: ["==", ["get", "id"], ""], paint: { "line-color": "#b8923a", "line-width": 4 } });
-      map.addLayer({ id: "hwy-corridor", type: "line", source: "hwy", layout: { visibility: "none", "line-cap": "round" }, paint: { "line-color": "#b8923a", "line-opacity": 0.5, "line-width": ["interpolate", ["exponential", 2], ["zoom"], 3, 0.55, 12, 283] } }); // true 5 km each side
+      map.addLayer({ id: "hwy-corridor", type: "line", source: "hwy", layout: { visibility: "none", "line-cap": "round" }, paint: { "line-color": "#b8923a", "line-opacity": 0.5, "line-width": ["interpolate", ["exponential", 2], ["zoom"], 3, 0.55, 12, 283] } });
       map.addLayer({ id: "hwy-line", type: "line", source: "hwy", layout: { visibility: "none" }, paint: { "line-color": "#ffffff", "line-width": 2.5 } });
       map.addLayer({ id: "rail-line", type: "line", source: "rail", layout: { visibility: "none" }, paint: { "line-color": "#e8d9a8", "line-width": 2.5, "line-dasharray": [2, 1.5] } });
       map.addLayer({ id: "disp-heat", type: "heatmap", source: "disp", layout: { visibility: "none" }, paint: { "heatmap-weight": ["get", "w"], "heatmap-radius": 45, "heatmap-intensity": 1.2, "heatmap-opacity": 0.8 } });
@@ -218,7 +243,6 @@ function GIS() {
     return () => map.remove();
   }, []);
 
-  // basemap + layer visibility + region shading
   useEffect(() => {
     const m = mapRef.current; if (!ready) return;
     Object.keys(BASEMAPS).forEach((k) => m.setLayoutProperty("base-" + k, "visibility", k === base ? "visible" : "none"));
@@ -230,10 +254,8 @@ function GIS() {
     m.setPaintProperty("regions-fill", "fill-opacity", choro ? 0.62 : 0.08);
   }, [ready, base, on, corridor, tool, choro, color, t]);
 
-  // selection highlight
   useEffect(() => { if (ready) mapRef.current.setFilter("regions-hl", ["==", ["get", "id"], sel || ""]); }, [ready, sel]);
 
-  // measurement drawings
   useEffect(() => {
     if (!ready) return;
     const f = pts.map((c) => pt(c));
@@ -245,10 +267,18 @@ function GIS() {
 
   useEffect(() => { if (mapRef.current) mapRef.current.getCanvas().style.cursor = ["buffer", "dist", "area"].includes(tool) ? "crosshair" : ""; }, [tool]);
 
-  const toggleLayer = (k) => setOn((s) => (s.includes(k) ? s.filter((x) => x !== k) : [...s, k]));
+  const toggleLayer = (k, isLocked) => {
+    if (isLocked) {
+      onPromptLogin("Parcel-level cadastral and beneficiary layers require approved Agency or Researcher clearance.");
+      return;
+    }
+    setOn((s) => (s.includes(k) ? s.filter((x) => x !== k) : [...s, k]));
+  };
+
   const fly = (o) => mapRef.current?.flyTo({ duration: 1400, ...o });
   const reset = () => { setTool(null); setPts([]); setSel(null); setOn(["agri"]); setYear(2025); setCorridor(false); setMsg(""); setQ(""); setBase("satellite"); fly(HOME); };
   const pick = (k) => { setTool(tool === k ? null : k); setPts([]); if (k === "cmp") setOn((s) => [...new Set([...s, "urban"])]); };
+
   function runQuery(text) {
     const s = text.toLowerCase(); setQ(text); setPts([]);
     if (s.includes("highway")) { setOn(["agri", "hwy"]); setCorridor(true); setTool(null); fly({ center: [76.5, 19.8], zoom: 6 }); setMsg("Agricultural land within 5 km of highways is highlighted in gold (corridor drawn to true scale, zoom in to see it). Estimated 41,300 km² across 4 regions, highest in Uttar Pradesh and Maharashtra."); }
@@ -256,14 +286,16 @@ function GIS() {
     else if (s.includes("urban")) { setOn(["urban"]); setTool("cmp"); setYear(2025); setCorridor(false); fly(HOME); setMsg("Built-up area grew fastest in Maharashtra and Karnataka between 2020 and 2025. Drag the year slider to compare with 2015."); }
     else setMsg("Try an example query below. This demo understands highways, disputes and urban expansion.");
   }
+
   const lu = region && ["Agriculture", "Urban", "Forest", "Other"].map((n, i) => ({ n, v: region.lu[i] }));
   const PIE = ["#7a8f3c", "#7b6a58", "#1f5a3a", "#c9bfa9"];
+
   return (
     <section id="gis" className="scroll-mt-16 bg-[#1b2a21] px-3 py-16 text-[#f4efe6] sm:px-5">
       <div className="mx-auto max-w-[1500px]">
         <p className="text-sm font-semibold text-[#d2b067]">Public GIS Map Explorer</p>
         <h2 className={`${serif} mt-1 text-4xl font-semibold`}>Explore land on the map</h2>
-        <p className="mt-2 max-w-2xl text-[#cfd6c9]">Switch the base map, toggle layers, measure, find hotspots, compare years and ask the map a question. Click a region for its profile. Regional figures are demo data.</p>
+        <p className="mt-2 max-w-2xl text-[#cfd6c9]">Switch base maps, toggle spatial layers, compute buffers and areas, examine dispute hotspots, compare decadal urban expansion and query with natural language.</p>
         <div className="mt-6 overflow-hidden rounded-xl border border-[#3a4d40] bg-[#23352a]">
           <div className="flex flex-wrap items-center gap-2 border-b border-[#3a4d40] p-3">
             {TOOLS.map(([k, label, I]) => (
@@ -273,26 +305,35 @@ function GIS() {
             {tool === "cmp" && <label className="flex items-center gap-2 text-sm">2015<input type="range" min="2015" max="2025" value={year} onChange={(e) => setYear(+e.target.value)} className="accent-[#b8923a]" />{year}</label>}
             <button onClick={reset} className="ml-auto flex items-center gap-1.5 rounded-md bg-[#2f4538] px-3 py-1.5 text-sm hover:bg-[#3a5345]"><RotateCcw size={15} />Reset</button>
           </div>
-          <div className="grid lg:grid-cols-[230px_1fr_310px]">
-            <div className="border-b border-[#3a4d40] p-4 lg:border-b-0 lg:border-r">
+          <div className="grid lg:grid-cols-[250px_1fr_310px]">
+            <div className="border-b border-[#3a4d40] p-4 lg:border-b-0 lg:border-r max-h-[580px] overflow-y-auto">
               <h3 className="flex items-center gap-2 text-sm font-semibold"><Layers size={15} />Layers</h3>
               <div className="mt-3 grid grid-cols-3 rounded-md bg-[#1b2a21] p-0.5 text-xs">
                 {Object.entries(BASEMAPS).map(([k, c]) => <button key={k} onClick={() => setBase(k)} className={`rounded py-1.5 ${base === k ? "bg-[#b8923a] font-medium text-[#1b2a21]" : "text-[#cfd6c9]"}`}>{c.label}</button>)}
               </div>
               {Object.entries(MAP_LAYERS).map(([g, ls]) => (
                 <div key={g} className="mt-4"><p className="text-xs font-semibold text-[#d2b067]">{g}</p>
-                  {ls.map(([k, name, c]) => (
-                    <label key={k} className="mt-1.5 flex cursor-pointer items-center gap-2 text-sm">
-                      <input type="checkbox" className="accent-[#b8923a]" checked={on.includes(k)} onChange={() => toggleLayer(k)} /><span className="h-3 w-3 rounded-sm" style={{ background: c }} />{name}
+                  {ls.map(([k, name, c, locked]) => (
+                    <label key={k} className={`mt-1.5 flex items-center gap-2 text-xs ${locked ? "opacity-75 cursor-pointer text-amber-200" : "cursor-pointer"}`}>
+                      <input
+                        type="checkbox"
+                        className="accent-[#b8923a]"
+                        checked={on.includes(k)}
+                        onChange={() => toggleLayer(k, locked)}
+                      />
+                      <span className="h-2.5 w-2.5 rounded-sm shrink-0" style={{ background: c }} />
+                      <span className="flex-1 truncate">{name}</span>
+                      {locked && <LockIcon size={11} className="text-[#b8923a] shrink-0" />}
                     </label>
-                  ))}</div>
+                  ))}
+                </div>
               ))}
-              <p className="mt-5 text-xs text-[#9fb0a2]">Region shading follows the first active land-use, climate, dispute or project layer.</p>
+              <p className="mt-5 text-[11px] text-[#9fb0a2]">Public access includes national open raster &amp; boundary layers. Parcel-level cadastres are restricted.</p>
             </div>
             <div className="relative min-h-[480px] bg-[#1b2a21]">
               <div ref={box} style={{ position: "absolute", inset: 0, width: "100%", height: "100%" }} />
               <div className="pointer-events-none absolute left-3 top-3 max-w-[250px] rounded-lg bg-[#1b2a21]/90 p-3 text-xs text-[#f4efe6]" aria-live="polite">
-                {!tool && "Click a region to see its profile."}
+                {!tool && "Click a region to inspect its spatial breakdown."}
                 {tool === "buffer" && `Buffer: click the map to draw a ${kmBuf} km zone.`}
                 {tool === "dist" && (dist ? `Distance: ${dist.toLocaleString()} km` : "Distance: click two points.")}
                 {tool === "area" && (areaKm ? `Area: ${areaKm.toLocaleString()} km²` : "Area: click three or more points.")}
@@ -300,29 +341,29 @@ function GIS() {
                 {tool === "cmp" && `Urban built-up comparison, ${year} vs 2015.`}
               </div>
             </div>
-            <div className="max-h-[560px] overflow-y-auto border-t border-[#3a4d40] p-4 lg:border-l lg:border-t-0">
+            <div className="max-h-[580px] overflow-y-auto border-t border-[#3a4d40] p-4 lg:border-l lg:border-t-0">
               {!region ? (
-                <div className="grid h-full min-h-40 place-items-center text-center text-sm text-[#b9c7bb]">Select a region on the map to view land use, infrastructure, projects, climate, disputes and related studies.</div>
+                <div className="grid h-full min-h-40 place-items-center text-center text-xs text-[#b9c7bb]">Select a region on the map to view land use, infrastructure, projects, climate, disputes and related studies.</div>
               ) : (<>
                 <h3 className={`${serif} text-2xl font-semibold`}>{region.name}</h3>
-                <p className="text-sm text-[#b9c7bb]">Area {region.area} km²</p>
+                <p className="text-xs text-[#b9c7bb]">Area {region.area} km²</p>
                 <h4 className="mt-4 text-xs font-semibold text-[#d2b067]">Land-use breakdown</h4>
                 <div className="flex items-center gap-3">
-                  <div className="h-28 w-28"><ResponsiveContainer><PieChart><Pie data={lu} dataKey="v" nameKey="n" innerRadius={28} outerRadius={50} stroke="none">{lu.map((_, i) => <Cell key={i} fill={PIE[i]} />)}</Pie><Tooltip formatter={(v) => v + "%"} /></PieChart></ResponsiveContainer></div>
-                  <ul className="text-xs">{lu.map((d, i) => <li key={d.n} className="flex items-center gap-1.5"><span className="h-2.5 w-2.5" style={{ background: PIE[i] }} />{d.n} {d.v}%</li>)}</ul>
+                  <div className="h-24 w-24"><ResponsiveContainer><PieChart><Pie data={lu} dataKey="v" nameKey="n" innerRadius={24} outerRadius={42} stroke="none">{lu.map((_, i) => <Cell key={i} fill={PIE[i]} />)}</Pie><Tooltip formatter={(v) => v + "%"} /></PieChart></ResponsiveContainer></div>
+                  <ul className="text-[11px] space-y-1">{lu.map((d, i) => <li key={d.n} className="flex items-center gap-1.5"><span className="h-2 w-2" style={{ background: PIE[i] }} />{d.n} {d.v}%</li>)}</ul>
                 </div>
-                <h4 className="mt-3 text-xs font-semibold text-[#d2b067]">Climate and risk index</h4>
-                <div className="h-28"><ResponsiveContainer><BarChart data={[{ n: "Flood", v: region.m.flood }, { n: "Heat", v: region.m.heat }, { n: "Disputes", v: region.m.disp }, { n: "Projects", v: region.m.proj }]}><XAxis dataKey="n" tick={{ fill: "#cfd6c9", fontSize: 11 }} axisLine={false} tickLine={false} /><YAxis hide domain={[0, 100]} /><Tooltip cursor={false} contentStyle={{ color: INK }} /><Bar dataKey="v" fill={GOLD} radius={[3, 3, 0, 0]} /></BarChart></ResponsiveContainer></div>
-                <dl className="mt-2 space-y-2 text-sm">
-                  <div><dt className="text-xs text-[#d2b067]">Climate indicators</dt><dd>Temperature anomaly {region.temp}, rainfall {region.rain}</dd></div>
-                  <div><dt className="text-xs text-[#d2b067]">Infrastructure</dt><dd>{region.infra}</dd></div>
-                  <div><dt className="text-xs text-[#d2b067]">Projects</dt><dd>{region.projects.join("; ")}</dd></div>
-                  <div><dt className="text-xs text-[#d2b067]">Disputes</dt><dd>{region.disputes.toLocaleString()} recorded cases</dd></div>
+                <h4 className="mt-3 text-xs font-semibold text-[#d2b067]">Climate &amp; risk index</h4>
+                <div className="h-24"><ResponsiveContainer><BarChart data={[{ n: "Flood", v: region.m.flood }, { n: "Heat", v: region.m.heat }, { n: "Disputes", v: region.m.disp }, { n: "Projects", v: region.m.proj }]}><XAxis dataKey="n" tick={{ fill: "#cfd6c9", fontSize: 10 }} axisLine={false} tickLine={false} /><YAxis hide domain={[0, 100]} /><Tooltip cursor={false} contentStyle={{ color: INK }} /><Bar dataKey="v" fill={GOLD} radius={[3, 3, 0, 0]} /></BarChart></ResponsiveContainer></div>
+                <dl className="mt-2 space-y-1.5 text-xs">
+                  <div><dt className="text-[11px] text-[#d2b067]">Climate anomaly</dt><dd>{region.temp}, rainfall {region.rain}</dd></div>
+                  <div><dt className="text-[11px] text-[#d2b067]">Infrastructure</dt><dd>{region.infra}</dd></div>
+                  <div><dt className="text-[11px] text-[#d2b067]">Key Projects</dt><dd>{region.projects.join("; ")}</dd></div>
+                  <div><dt className="text-[11px] text-[#d2b067]">Disputes</dt><dd>{region.disputes.toLocaleString()} active proceedings</dd></div>
                 </dl>
-                <h4 className="mt-3 text-xs font-semibold text-[#d2b067]">Related studies</h4>
-                <ul className="mt-1 space-y-1.5">{region.studies.map((id) => {
+                <h4 className="mt-3 text-xs font-semibold text-[#d2b067]">Indexed studies</h4>
+                <ul className="mt-1 space-y-1">{region.studies.map((id) => {
                   const s = STUDIES.find((x) => x.id === id); return (
-                    <li key={id}><button onClick={() => nav(`/study/${id}`)} className="flex w-full items-start gap-2 rounded-md bg-[#2f4538] p-2 text-left text-xs hover:bg-[#3a5345]"><FileText size={14} className="mt-0.5 shrink-0 text-[#d2b067]" />{s.title}</button></li>);
+                    <li key={id}><button onClick={() => nav(`/study/${id}`)} className="flex w-full items-start gap-1.5 rounded-md bg-[#2f4538] p-1.5 text-left text-[11px] hover:bg-[#3a5345]"><FileText size={12} className="mt-0.5 shrink-0 text-[#d2b067]" />{s.title}</button></li>);
                 })}</ul>
               </>)}
             </div>
@@ -342,69 +383,229 @@ function GIS() {
   );
 }
 
-/* ---------------- Page ---------------- */
+/* ---------------- Main Landing Page ---------------- */
 export default function LandingPage() {
   const [auth, setAuth] = useState(null);
+  const [authMsg, setAuthMsg] = useState("");
   const [menu, setMenu] = useState(false);
+  const [exportOpen, setExportOpen] = useState(false);
+  const [feedbackOpen, setFeedbackOpen] = useState(false);
+
   useEffect(() => {
     const id = window.location.hash.slice(1);
     if (id) setTimeout(() => go(id), 50);
   }, []);
-  const links = [["home", "Home"], ["repository", "Study Repository"], ["gis", "GIS Explorer"]];
-  const stats = [["14", "studies indexed"], ["6", "regions mapped"], ["5", "data layers"], ["7", "role workspaces"]];
+
+  const openAuthWithMsg = (msg) => {
+    setAuthMsg(msg);
+    setAuth("login");
+  };
+
+  const links = [
+    ["home", "Home"],
+    ["repository", "Study Repository"],
+    ["gis", "GIS Explorer"],
+    ["dashboards", "Dashboards"],
+    ["innovation", "Innovation"],
+    ["system", "System Flow"],
+    ["feedback", "Feedback"],
+  ];
+
   return (
     <div className="min-h-screen bg-[#f4efe6] font-['Public_Sans',sans-serif] text-[#26282b]">
       <style>{`@import url('https://fonts.googleapis.com/css2?family=Newsreader:opsz,wght@6..72,500;6..72,600&family=Public+Sans:wght@400;500;600&display=swap');`}</style>
+
+      {/* Main Top Header */}
       <header className="sticky top-0 z-40 border-b border-[#1f3d2b]/15 bg-[#f4efe6]/95 backdrop-blur">
         <div className="mx-auto flex h-16 max-w-7xl items-center justify-between px-5">
-          <button onClick={() => go("home")} className="flex items-center gap-2.5"><span className="grid h-9 w-9 place-items-center rounded-md bg-[#1f3d2b] text-[#d2b067]"><Landmark size={18} /></span><span className={`${serif} text-2xl font-semibold text-[#1f3d2b]`}>Bhoomi</span></button>
+          <button onClick={() => go("home")} className="flex items-center gap-2.5">
+            <span className="grid h-9 w-9 place-items-center rounded-md bg-[#1f3d2b] text-[#d2b067]"><Landmark size={18} /></span>
+            <span className={`${serif} text-2xl font-semibold text-[#1f3d2b]`}>Bhoomi</span>
+            <span className="rounded-full bg-[#e3ecdf] px-2.5 py-0.5 text-xs font-semibold text-[#1f3d2b] hidden sm:inline">National Land Portal</span>
+          </button>
+
           <nav className="hidden items-center gap-1 md:flex" aria-label="Main">
-            {links.map(([id, l]) => <button key={id} onClick={() => go(id)} className="rounded-md px-3 py-2 text-sm font-medium text-stone-700 hover:bg-[#1f3d2b]/10">{l}</button>)}
-            <button onClick={() => setAuth("register")} className="ml-2 rounded-md px-3 py-2 text-sm font-medium text-[#1f3d2b] hover:bg-[#1f3d2b]/10">Register</button>
-            <button onClick={() => setAuth("login")} className="flex items-center gap-1.5 rounded-md bg-[#1f3d2b] px-4 py-2 text-sm font-medium text-white hover:bg-[#2a5239]"><LogIn size={15} />Login</button>
+            {links.map(([id, l]) => (
+              <button key={id} onClick={() => go(id)} className="rounded-md px-2.5 py-1.5 text-xs font-semibold text-stone-700 hover:text-[#1f3d2b] hover:bg-[#1f3d2b]/10 transition">
+                {l}
+              </button>
+            ))}
+            <button
+              onClick={() => setExportOpen(true)}
+              className="flex items-center gap-1 rounded-md px-2.5 py-1.5 text-xs font-semibold text-[#1f3d2b] hover:bg-[#1f3d2b]/10"
+              title="Export Public Report"
+            >
+              <Download size={14} /> Export
+            </button>
+            <button
+              type="button"
+              onClick={() => window.dispatchEvent(new CustomEvent("open-bhoomi-ai"))}
+              className="flex items-center gap-1 rounded-md border border-[#b8923a]/40 bg-white px-2.5 py-1.5 text-xs font-semibold text-[#1f3d2b] hover:bg-[#b8923a]/15 shadow-sm"
+            >
+              <Sparkles size={13} className="text-[#b8923a]" /> AI
+            </button>
+            <button onClick={() => setAuth("register")} className="ml-2 rounded-md px-3 py-1.5 text-xs font-semibold text-[#1f3d2b] hover:bg-[#1f3d2b]/10">
+              Register
+            </button>
+            <button onClick={() => setAuth("login")} className="flex items-center gap-1.5 rounded-lg bg-[#1f3d2b] px-3.5 py-1.5 text-xs font-semibold text-white hover:bg-[#2a5239] shadow-sm">
+              <LogIn size={14} /> Login
+            </button>
           </nav>
+
           <button className="md:hidden" onClick={() => setMenu(!menu)} aria-label="Menu"><Menu /></button>
         </div>
-        {menu && <div className="flex flex-col gap-1 border-t border-stone-300 px-5 py-3 md:hidden">
-          {links.map(([id, l]) => <button key={id} onClick={() => { go(id); setMenu(false); }} className="py-2 text-left text-sm">{l}</button>)}
-          <button onClick={() => { setAuth("login"); setMenu(false); }} className="py-2 text-left text-sm font-semibold text-[#1f3d2b]">Login</button>
-        </div>}
+
+        {menu && (
+          <div className="flex flex-col gap-1 border-t border-stone-300 px-5 py-3 md:hidden bg-white">
+            {links.map(([id, l]) => (
+              <button key={id} onClick={() => { go(id); setMenu(false); }} className="py-2 text-left text-sm font-medium">
+                {l}
+              </button>
+            ))}
+            <button onClick={() => { setExportOpen(true); setMenu(false); }} className="py-2 text-left text-sm font-semibold text-[#1f3d2b]">
+              Export Public Report
+            </button>
+            <button onClick={() => { setAuth("login"); setMenu(false); }} className="py-2 text-left text-sm font-semibold text-[#1f3d2b]">
+              Login
+            </button>
+          </div>
+        )}
       </header>
 
+      {/* Hero Section */}
       <section id="home" className="relative scroll-mt-16 overflow-hidden px-5 pb-16 pt-16 sm:pt-24">
         <svg className="pointer-events-none absolute -right-20 top-0 h-full w-[720px] opacity-40" viewBox="0 0 600 600" fill="none" stroke="#1f3d2b" strokeOpacity=".35" aria-hidden="true">
           {[...Array(11)].map((_, i) => <ellipse key={i} cx="350" cy="300" rx={40 + i * 26} ry={28 + i * 21} transform={`rotate(${-18 + i * 2} 350 300)`} />)}
         </svg>
         <div className="relative mx-auto max-w-7xl">
+          <span className="inline-block rounded-full bg-[#e3ecdf] text-[#1f3d2b] px-3 py-1 text-xs font-semibold mb-3 border border-[#1f3d2b]/15">
+            Ministry of Rural Development · Department of Land Resources
+          </span>
           <h1 className={`${serif} text-6xl font-semibold tracking-tight text-[#1f3d2b] sm:text-8xl`}>BHOOMI</h1>
           <p className={`${serif} mt-3 max-w-3xl text-2xl text-[#26282b] sm:text-3xl`}>A Unified Intelligence Platform for Land &amp; Geospatial Studies</p>
           <p className="mt-5 max-w-2xl text-lg leading-relaxed text-stone-700">Bhoomi brings land-governance research, policy papers, datasets and satellite-derived map layers into one open platform. Search the evidence, see it on the map, and sign in when you are ready to analyse, simulate and act.</p>
           <div className="mt-8 flex flex-wrap gap-3">
-            <button onClick={() => go("repository")} className="flex items-center gap-2 rounded-lg bg-[#1f3d2b] px-5 py-3 font-medium text-white hover:bg-[#2a5239]"><Search size={17} />Explore Study Repository</button>
-            <button onClick={() => go("gis")} className="flex items-center gap-2 rounded-lg border border-[#1f3d2b] px-5 py-3 font-medium text-[#1f3d2b] hover:bg-[#1f3d2b]/10"><Layers size={17} />Explore GIS Map</button>
-            <button onClick={() => setAuth("login")} className="flex items-center gap-2 rounded-lg border-b-2 border-[#b8923a] px-4 py-3 font-medium text-[#26282b] hover:bg-[#b8923a]/15"><LogIn size={17} />Login</button>
+            <button onClick={() => go("repository")} className="flex items-center gap-2 rounded-xl bg-[#1f3d2b] px-5 py-3 font-semibold text-white hover:bg-[#2a5239] shadow-sm"><Search size={17} />Explore Study Repository</button>
+            <button onClick={() => go("gis")} className="flex items-center gap-2 rounded-xl border border-[#1f3d2b] bg-white/60 px-5 py-3 font-semibold text-[#1f3d2b] hover:bg-[#1f3d2b]/10"><Layers size={17} />Explore GIS Map</button>
+            <button onClick={() => go("dashboards")} className="flex items-center gap-2 rounded-xl border border-stone-300 bg-white px-5 py-3 font-semibold text-stone-800 hover:bg-stone-50"><BarChart3 size={17} />Public Dashboards</button>
+            <button onClick={() => setAuth("login")} className="flex items-center gap-2 rounded-xl border-b-2 border-[#b8923a] px-4 py-3 font-semibold text-[#26282b] hover:bg-[#b8923a]/15"><LogIn size={17} />Login</button>
           </div>
-          <dl className="mt-14 grid max-w-2xl grid-cols-2 gap-6 border-t border-[#1f3d2b]/25 pt-6 sm:grid-cols-4">
-            {stats.map(([n, l]) => <div key={l}><dt className={`${serif} text-3xl font-semibold text-[#1f3d2b]`}>{n}</dt><dd className="text-sm text-stone-600">{l}</dd></div>)}
+          <dl className="mt-14 grid max-w-3xl grid-cols-2 gap-6 border-t border-[#1f3d2b]/25 pt-6 sm:grid-cols-4">
+            {[["1,284", "studies & datasets"], ["640K+", "villages covered"], ["17", "spatial analytics"], ["7", "role workspaces"]].map(([n, l]) => (
+              <div key={l}><dt className={`${serif} text-3xl font-semibold text-[#1f3d2b]`}>{n}</dt><dd className="text-xs text-stone-600 mt-0.5">{l}</dd></div>
+            ))}
           </dl>
         </div>
       </section>
 
-      <Repository />
-      <GIS />
+      {/* Study Repository */}
+      <Repository onPromptLogin={openAuthWithMsg} />
 
-      <section className="bg-[#f4efe6] px-5 py-20">
-        <div className="mx-auto flex max-w-5xl flex-wrap items-center justify-between gap-6 rounded-xl border border-[#1f3d2b]/25 border-l-4 border-l-[#b8923a] bg-white p-8">
-          <div className="max-w-xl"><h2 className={`${serif} text-3xl font-semibold text-[#1f3d2b]`}>Ready to analyse and act?</h2>
-            <p className="mt-2 text-stone-600">Sign in to reach your role-specific workspace: research tools, policy simulation, agency data operations, institutional hubs and more.</p></div>
-          <div className="flex gap-3">
-            <button onClick={() => setAuth("login")} className="flex items-center gap-2 rounded-lg bg-[#1f3d2b] px-5 py-3 font-medium text-white hover:bg-[#2a5239]"><LogIn size={16} />Login</button>
-            <button onClick={() => setAuth("register")} className="flex items-center gap-2 rounded-lg border border-[#1f3d2b] px-5 py-3 font-medium text-[#1f3d2b] hover:bg-[#1f3d2b]/10"><UserPlus size={16} />Register</button>
+      {/* GIS Explorer */}
+      <GIS onPromptLogin={openAuthWithMsg} />
+
+      {/* Public Dashboards with 4-Level Drill-Down */}
+      <section id="dashboards" className="scroll-mt-16 bg-[#faf7f1] px-5 py-20 border-t border-stone-200">
+        <div className="mx-auto max-w-7xl">
+          <div className="flex flex-wrap items-end justify-between gap-4 mb-8">
+            <div>
+              <p className="text-sm font-semibold text-[#b8923a]">Aggregated &amp; Released Data</p>
+              <h2 className={`${serif} mt-1 text-4xl font-semibold text-[#1f3d2b]`}>Public Governance Dashboards</h2>
+              <p className="mt-2 max-w-2xl text-stone-600 text-sm">
+                Explore aggregated indicators across National, State, District and Local administrative tiers. Model projections are distinctly demarcated from observed records.
+              </p>
+            </div>
+            <button
+              onClick={() => setExportOpen(true)}
+              className="flex items-center gap-1.5 rounded-xl border border-stone-300 bg-white px-4 py-2 text-xs font-semibold text-stone-700 hover:bg-stone-50 transition shadow-sm"
+            >
+              <Download size={14} /> Export Public Indicators (PDF/Excel)
+            </button>
+          </div>
+          <PublicDashboard defaultLevel="national" />
+        </div>
+      </section>
+
+      {/* Innovation Portal (Public Showcase) */}
+      <section id="innovation" className="scroll-mt-16 bg-[#f4efe6] px-5 py-20 border-t border-stone-200">
+        <div className="mx-auto max-w-7xl">
+          <InnovationPortal role="public" onPostChallenge={() => setAuth("login")} />
+        </div>
+      </section>
+
+      {/* Closed-Loop System Flow & M&E Architecture */}
+      <section id="system" className="scroll-mt-16 bg-[#faf7f1] px-5 py-20 border-t border-stone-200">
+        <div className="mx-auto max-w-7xl">
+          <SystemFlowDiagram />
+        </div>
+      </section>
+
+      {/* Feedback Section */}
+      <section id="feedback" className="scroll-mt-16 bg-white px-5 py-20 border-t border-stone-200">
+        <div className="mx-auto max-w-4xl rounded-2xl border border-stone-300 bg-[#faf7f1] p-8 shadow-sm">
+          <div className="flex flex-wrap items-center justify-between gap-4 border-b border-stone-200 pb-4">
+            <div>
+              <span className="text-xs font-semibold uppercase tracking-wider text-[#b8923a]">Public Participation &amp; Data Quality</span>
+              <h2 className={`${serif} text-3xl font-semibold text-[#1f3d2b] mt-0.5`}>Report Discrepancies or Suggest Features</h2>
+              <p className="mt-1 text-xs text-stone-600">
+                Help state agencies fix cadastral errors, refine boundary markers, and suggest platform improvements.
+              </p>
+            </div>
+            <button
+              onClick={() => setFeedbackOpen(true)}
+              className="flex items-center gap-1.5 rounded-xl bg-[#1f3d2b] px-4 py-2.5 text-xs font-semibold text-white hover:bg-[#2a5239] transition shadow-sm"
+            >
+              <Flag size={14} /> Open Report Form
+            </button>
+          </div>
+          <div className="mt-6 grid grid-cols-2 sm:grid-cols-3 gap-3 text-xs">
+            {[
+              "Incorrect dataset records",
+              "Map overlay or boundary error",
+              "Document formatting issue",
+              "Research study correction",
+              "Platform system problem",
+              "Feature or language request",
+            ].map((cat, i) => (
+              <div key={i} className="flex items-center gap-2 rounded-xl bg-white p-3 border border-stone-200">
+                <CheckCircle2 size={14} className="text-[#1f3d2b] shrink-0" />
+                <span className="font-medium text-stone-700">{cat}</span>
+              </div>
+            ))}
           </div>
         </div>
       </section>
-      <footer className="bg-[#1f3d2b] px-5 py-6 text-center text-sm text-[#cfd6c9]">Bhoomi · Department of Land Resources, Ministry of Rural Development · Demo build with mock data</footer>
-      {auth && <AuthModal initial={auth} onClose={() => setAuth(null)} />}
+
+      {/* Sign-in Call to Action */}
+      <section className="bg-[#1f3d2b] px-5 py-16 text-white">
+        <div className="mx-auto flex max-w-5xl flex-wrap items-center justify-between gap-6 rounded-2xl border border-[#b8923a]/40 bg-[#162d20] p-8">
+          <div className="max-w-xl">
+            <h2 className={`${serif} text-3xl font-semibold text-[#f4efe6]`}>Ready to analyse and act?</h2>
+            <p className="mt-2 text-stone-300 text-sm leading-relaxed">
+              Sign in to reach your role-specific workspace: policy simulations, agency data operations, institutional research hubs, industry challenges and full API toolkits.
+            </p>
+          </div>
+          <div className="flex gap-3">
+            <button onClick={() => setAuth("login")} className="flex items-center gap-2 rounded-xl bg-[#b8923a] px-5 py-3 text-sm font-semibold text-[#1f3d2b] hover:bg-[#c9a34b] transition shadow-sm">
+              <LogIn size={16} /> Login
+            </button>
+            <button onClick={() => setAuth("register")} className="flex items-center gap-2 rounded-xl border border-white/20 bg-white/10 px-5 py-3 text-sm font-semibold text-white hover:bg-white/20 transition">
+              <UserPlus size={16} /> Register
+            </button>
+          </div>
+        </div>
+      </section>
+
+      {/* Footer */}
+      <footer className="bg-[#162d20] border-t border-white/10 px-5 py-8 text-center text-xs text-[#cfd6c9]">
+        <p>Bhoomi · Department of Land Resources, Ministry of Rural Development, Government of India</p>
+        <p className="mt-1 text-stone-400">Unified Spatial Intelligence and Governance Platform · Built with MapLibre &amp; Open Geospatial Standards</p>
+      </footer>
+
+      {/* Modals */}
+      {auth && <AuthModal initial={auth} message={authMsg} onClose={() => { setAuth(null); setAuthMsg(""); }} />}
+      {exportOpen && <ReportExportModal isOpen={true} onClose={() => setExportOpen(false)} role="public" />}
+      {feedbackOpen && <FeedbackModal isOpen={true} onClose={() => setFeedbackOpen(false)} />}
     </div>
   );
 }

@@ -6,6 +6,7 @@ import {
   Trophy, Award, LogOut, X, Loader2, CheckCircle2, MessageSquare, Clock, Search, ArrowRight, Bell, CalendarDays, MapPin,
 } from "lucide-react";
 import { MapModal } from "../components/MapLibreMap";
+import NotificationCenter from "../components/NotificationCenter";
 import { REGIONS } from "../data/Studies";
 
 /* ---------- Sample data ---------- */
@@ -151,6 +152,7 @@ export default function Researcher({ user, onLogout: logoutProp }) {
             <button onClick={() => setOpen(true)} className="flex items-center gap-2 rounded-lg bg-[#1f3d2b] px-4 py-2 text-sm font-semibold text-white hover:bg-[#2a5239] transition">
               <Plus size={16} /> Add research
             </button>
+            <NotificationCenter role="researcher" />
             <button onClick={onLogout} aria-label="Sign out" title="Sign out" className="grid h-10 w-10 place-items-center rounded-xl text-stone-600 hover:bg-stone-200/60 transition"><LogOut size={18} /></button>
           </div>
         </div>

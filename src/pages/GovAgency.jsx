@@ -4,6 +4,7 @@ import {
   Landmark, LogOut, Database, Flag, Upload, Plug, RefreshCw, CheckCircle2, XCircle, Loader2, X, ChevronRight, Gauge, ClipboardList, MapPin, Sparkles, Layers,
 } from "lucide-react";
 import MapLibreMap, { MapModal } from "../components/MapLibreMap";
+import NotificationCenter from "../components/NotificationCenter";
 
 /* ---------- Sample data ---------- */
 const TYPES = ["Land records", "Cadastral survey", "Satellite imagery", "Project data", "Socio-economic", "Dispute statistics", "Policy documents"];
@@ -265,6 +266,7 @@ export default function GovAgency({ user, onLogout: logoutProp }) {
           <div className="ml-auto flex items-center gap-2">
             <button type="button" onClick={() => window.dispatchEvent(new CustomEvent("open-bhoomi-ai"))} className="flex items-center gap-1.5 rounded-lg border border-[#b8923a]/40 bg-[#faf7f1] px-3.5 py-2 text-sm font-semibold text-[#1f3d2b] hover:bg-[#b8923a]/15 transition"><Sparkles size={15} className="text-[#b8923a]" />Bhoomi AI</button>
             <button onClick={() => setWizard(true)} className="flex items-center gap-1.5 rounded-lg bg-[#1f3d2b] px-4 py-2 text-sm font-semibold text-white hover:bg-[#2a5239] transition"><Upload size={15} /> Upload data</button>
+            <NotificationCenter role="agency" />
             <button onClick={onLogout} aria-label="Sign out" title="Sign out" className="grid h-10 w-10 place-items-center rounded-xl text-stone-600 hover:bg-stone-200/60 transition"><LogOut size={18} /></button>
           </div>
         </div>

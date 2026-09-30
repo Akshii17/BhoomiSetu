@@ -7,6 +7,7 @@ import {
   Landmark, LogOut, ArrowUpRight, ArrowDownRight, Play, Scale, FileText, Megaphone, Target, Bell, Loader2, X, CheckCircle2, MapPin, Sparkles, Layers,
 } from "lucide-react";
 import { MapModal } from "../components/MapLibreMap";
+import NotificationCenter from "../components/NotificationCenter";
 import { REGIONS as GEO_REGIONS } from "../data/Studies";
 
 /* ---------- Sample data ---------- */
@@ -171,6 +172,7 @@ export default function PolicyMaker({ user, onLogout: logoutProp }) {
             {[["challenge", Megaphone, "Post challenge"], ["baseline", Target, "Set baseline"], ["report", FileText, "Generate report"]].map(([m, I, l]) => (
               <button key={m} onClick={() => openModal(m)} className="flex items-center gap-2 rounded-lg border border-stone-300 bg-white px-3.5 py-2 text-sm font-semibold text-stone-700 hover:bg-[#faf7f1] transition"><I size={15} />{l}</button>
             ))}
+            <NotificationCenter role="policymaker" />
             <button onClick={onLogout} aria-label="Sign out" title="Sign out" className="grid h-10 w-10 place-items-center rounded-xl text-stone-600 hover:bg-stone-200/60 transition"><LogOut size={18} /></button>
           </div>
         </div>

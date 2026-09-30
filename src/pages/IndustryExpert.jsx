@@ -8,6 +8,7 @@ import * as maplibregl from "maplibre-gl";
 import "maplibre-gl/dist/maplibre-gl.css";
 import { ROLES } from "../roles";
 import MapLibreMap, { MapModal } from "../components/MapLibreMap";
+import NotificationCenter from "../components/NotificationCenter";
 
 /* ---------------- mock data (swap for /api calls later) ---------------- */
 const SKILLS = ["Remote sensing", "GIS", "AI/ML", "IoT", "Blockchain", "Data engineering", "Legal tech", "Mobile apps"];
@@ -299,6 +300,7 @@ export default function Industry({ user: userProp, onLogout: logoutProp }) {
               <p className="text-sm font-medium text-stone-900">{user.name}</p>
               <p className="text-xs text-stone-500">{ROLES.industry.label}</p>
             </div>
+            <NotificationCenter role="industry" />
             <button onClick={onLogout} aria-label="Sign out" title="Sign out" className="grid h-10 w-10 place-items-center rounded-xl text-stone-600 hover:bg-stone-200/60 transition">
               <LogOut size={18} />
             </button>

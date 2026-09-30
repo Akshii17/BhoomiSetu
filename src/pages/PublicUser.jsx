@@ -5,9 +5,14 @@ import "maplibre-gl/dist/maplibre-gl.css";
 import { AreaChart, Area, PieChart, Pie, Cell, ResponsiveContainer, Tooltip } from "recharts";
 import {
   Landmark, Search, Sparkles, Layers, ArrowRight, MapPin, Thermometer, Droplets,
-  Loader2, Flag, Trophy, BookOpen, Scale, CloudRain, FolderKanban, TrendingUp, Send, CheckCircle2, LogOut,
+  Loader2, Flag, Trophy, BookOpen, Scale, CloudRain, FolderKanban, TrendingUp, Send, CheckCircle2, LogOut, Download, Lock,
 } from "lucide-react";
 import { BASEMAPS, baseStyle } from "../data/Studies";
+import NotificationCenter from "../components/NotificationCenter";
+import ReportExportModal from "../components/ReportExportModal";
+import PublicDashboard from "../components/PublicDashboard";
+import InnovationPortal from "../components/InnovationPortal";
+import { Gate } from "../roles";
 
 /* ---------- Map sources (free public tile APIs) ---------- */
 const BASES = {
@@ -63,6 +68,8 @@ export default function PublicUser({ user, onLogout: logoutProp }) {
   const [district, setDistrict] = useState(null);
   const [issue, setIssue] = useState({ type: ISSUE_TYPES[0], text: "" });
   const [sent, setSent] = useState(false);
+  const [exportOpen, setExportOpen] = useState(false);
+  const [innovationOpen, setInnovationOpen] = useState(false);
 
   /* Map init */
   useEffect(() => {
@@ -153,6 +160,10 @@ export default function PublicUser({ user, onLogout: logoutProp }) {
           <div className="flex items-center gap-3">
             <button type="button" onClick={() => window.dispatchEvent(new CustomEvent("open-bhoomi-ai"))} className="flex items-center gap-1.5 rounded-lg border border-[#b8923a]/40 bg-[#faf7f1] px-3.5 py-2 text-sm font-semibold text-[#1f3d2b] hover:bg-[#b8923a]/15 transition">
               <Sparkles size={15} className="text-[#b8923a]" /> Bhoomi AI
+            </button>
+            <NotificationCenter role="public" />
+            <button onClick={() => setExportOpen(true)} aria-label="Export data" title="Export public indicators" className="grid h-10 w-10 place-items-center rounded-xl text-stone-600 hover:bg-stone-200/60 transition">
+              <Download size={18} />
             </button>
             <button onClick={onLogout} aria-label="Sign out" title="Sign out" className="grid h-10 w-10 place-items-center rounded-xl text-stone-600 hover:bg-stone-200/60 transition">
               <LogOut size={18} />
@@ -317,18 +328,24 @@ export default function PublicUser({ user, onLogout: logoutProp }) {
         </div>
       </section>
 
-      {/* Innovation Challenge Banner */}
-      <section id="innovation" className="mx-auto mt-20 max-w-7xl px-5">
-        <div className="flex flex-col items-start justify-between gap-6 rounded-2xl border border-stone-300 border-l-4 border-l-[#b8923a] bg-white p-8 sm:flex-row sm:items-center">
-          <div className="flex items-start gap-4">
-            <span className="grid h-12 w-12 shrink-0 place-items-center rounded-xl bg-[#f4efe6] text-[#b8923a]"><Trophy size={24} /></span>
-            <div>
-              <h2 className="font-['Newsreader',serif] text-2xl font-medium text-[#1f3d2b] sm:text-3xl">Land Data Challenge is open for entries</h2>
-              <p className="mt-1 max-w-xl text-stone-600 text-sm">Build a tool with open land datasets. Winning ideas receive grants and are considered for official pilots.</p>
-            </div>
+      {/* Public Governance Dashboard */}
+      <section id="research" className="mx-auto mt-20 max-w-7xl px-5">
+        <div className="flex flex-wrap items-end justify-between gap-4 mb-6">
+          <div>
+            <p className="text-xs font-semibold text-[#b8923a] uppercase tracking-wider">Aggregated &amp; Released Data</p>
+            <h2 className="font-['Newsreader',serif] text-3xl font-medium text-[#1f3d2b] mt-1">Public Governance Dashboards</h2>
+            <p className="mt-1 text-stone-600 text-sm max-w-xl">Explore aggregated indicators across National, State, District and Local tiers. Model projections are clearly marked.</p>
           </div>
-          <button className="shrink-0 rounded-xl bg-[#1f3d2b] px-6 py-3 font-semibold text-white hover:bg-[#2a5239] transition">See details</button>
+          <button onClick={() => setExportOpen(true)} className="flex items-center gap-1.5 rounded-xl border border-stone-300 bg-white px-4 py-2 text-xs font-semibold text-stone-700 hover:bg-stone-50 transition shadow-sm">
+            <Download size={14} /> Export Indicators (PDF/Excel)
+          </button>
         </div>
+        <PublicDashboard defaultLevel="national" />
+      </section>
+
+      {/* Innovation Portal */}
+      <section id="innovation" className="mx-auto mt-20 max-w-7xl px-5">
+        <InnovationPortal role="public" onPostChallenge={() => {}} />
       </section>
 
       {/* Report an issue */}
@@ -355,6 +372,9 @@ export default function PublicUser({ user, onLogout: logoutProp }) {
           )}
         </div>
       </section>
+
+      {/* Modals */}
+      {exportOpen && <ReportExportModal isOpen={true} onClose={() => setExportOpen(false)} role="public" />}
     </div>
   );
 }

@@ -7,6 +7,7 @@ import {
 import { ResponsiveContainer, PieChart, Pie, Cell, Tooltip } from "recharts";
 import { ROLES } from "../roles";
 import MapLibreMap, { MapModal } from "../components/MapLibreMap";
+import NotificationCenter from "../components/NotificationCenter";
 
 /* ---------------- mock data (swap for /api calls later) ---------------- */
 const NAV = [
@@ -286,6 +287,7 @@ export default function Admin({ user: userProp, onLogout: logoutProp }) {
               <p className="text-sm font-medium text-stone-900">{user.name}</p>
               <p className="text-xs text-stone-500">Admin Clearance Level 4</p>
             </div>
+            <NotificationCenter role="admin" />
             <button onClick={onLogout} aria-label="Sign out" title="Sign out" className="grid h-10 w-10 place-items-center rounded-xl text-stone-600 hover:bg-stone-200/60 transition">
               <LogOut size={18} />
             </button>

@@ -5,6 +5,7 @@ import {
   Landmark, LogOut, FileText, Database, Users, UserPlus, FolderKanban, Award, Trophy, Plus, X, ChevronLeft, ChevronRight, Trash2, TrendingUp, Upload, Sparkles, MapPin,
 } from "lucide-react";
 import { MapModal } from "../components/MapLibreMap";
+import NotificationCenter from "../components/NotificationCenter";
 
 /* ---------- Sample data ---------- */
 const ROLES = ["Institution admin", "Lead researcher", "Researcher", "Student", "Viewer"];
@@ -131,6 +132,7 @@ export default function Institution({ user, onLogout: logoutProp }) {
           <span className="rounded-full bg-[#e3ecdf] px-3 py-0.5 text-xs font-semibold text-[#1f3d2b]">Academic Institution</span>
           <div className="ml-auto flex items-center gap-2">
             <button type="button" onClick={() => window.dispatchEvent(new CustomEvent("open-bhoomi-ai"))} className="flex items-center gap-1.5 rounded-lg border border-[#b8923a]/40 bg-[#faf7f1] px-3.5 py-2 text-sm font-semibold text-[#1f3d2b] hover:bg-[#b8923a]/15 transition"><Sparkles size={15} className="text-[#b8923a]" />Bhoomi AI</button>
+            <NotificationCenter role="academic" />
             <button onClick={onLogout} aria-label="Sign out" title="Sign out" className="grid h-10 w-10 place-items-center rounded-xl text-stone-600 hover:bg-stone-200/60 transition"><LogOut size={18} /></button>
           </div>
         </div>
