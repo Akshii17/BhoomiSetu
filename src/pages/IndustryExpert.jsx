@@ -284,19 +284,29 @@ export default function Industry({ user: userProp, onLogout: logoutProp }) {
       <style>{`@import url('https://fonts.googleapis.com/css2?family=Newsreader:opsz,wght@6..72,500;6..72,600&family=Public+Sans:wght@400;500;600&display=swap');`}</style>
 
       {/* Header */}
-      <header className="sticky top-0 z-20 flex items-center justify-between gap-3 border-b border-[#1f3d2b]/15 bg-[#f4efe6]/95 px-5 py-3 backdrop-blur sm:px-8">
-        <div className="flex items-center gap-2.5">
-          <span className="grid h-9 w-9 place-items-center rounded-lg bg-[#1f3d2b] text-[#d2b067]"><Landmark size={18} /></span>
-          <div><p className="font-['Newsreader',serif] text-xl font-semibold leading-none text-[#1f3d2b]">Bhoomi</p><p className="mt-1 text-xs text-[#5c5a4b]">Industry & Innovation</p></div>
-        </div>
-        <div className="flex items-center gap-3">
-          <button type="button" onClick={() => window.dispatchEvent(new CustomEvent("open-bhoomi-ai"))} className="flex items-center gap-2 rounded-lg bg-[#1f3d2b] px-3.5 py-2 text-sm font-semibold text-white hover:bg-[#2a5239] transition"><Sparkles size={15} />Bhoomi AI</button>
-          <div className="hidden text-right sm:block"><p className="text-sm font-medium text-stone-900">{user.name}</p><p className="text-xs text-stone-500">{ROLES.industry.label}</p></div>
-          <button onClick={onLogout} className="flex items-center gap-2 rounded-lg border border-stone-300 bg-white px-3.5 py-2 text-sm font-semibold text-stone-700 hover:bg-stone-50 transition"><LogOut size={15} />Sign out</button>
+      <header className="sticky top-0 z-40 border-b border-[#1f3d2b]/15 bg-[#f4efe6]/95 backdrop-blur">
+        <div className="mx-auto flex max-w-7xl items-center justify-between px-5 py-3">
+          <div className="flex items-center gap-2.5">
+            <span className="grid h-9 w-9 place-items-center rounded-md bg-[#1f3d2b] text-[#d2b067]"><Landmark size={18} /></span>
+            <span className="font-['Newsreader',serif] text-2xl font-semibold text-[#1f3d2b]">Bhoomi</span>
+            <span className="rounded-full bg-[#e3ecdf] px-3 py-0.5 text-xs font-semibold text-[#1f3d2b]">Industry &amp; Innovation</span>
+          </div>
+          <div className="flex items-center gap-3">
+            <button type="button" onClick={() => window.dispatchEvent(new CustomEvent("open-bhoomi-ai"))} className="flex items-center gap-1.5 rounded-lg border border-[#b8923a]/40 bg-[#faf7f1] px-3.5 py-2 text-sm font-semibold text-[#1f3d2b] hover:bg-[#b8923a]/15 transition">
+              <Sparkles size={15} className="text-[#b8923a]" /> Bhoomi AI
+            </button>
+            <div className="hidden text-right sm:block">
+              <p className="text-sm font-medium text-stone-900">{user.name}</p>
+              <p className="text-xs text-stone-500">{ROLES.industry.label}</p>
+            </div>
+            <button onClick={onLogout} aria-label="Sign out" title="Sign out" className="grid h-10 w-10 place-items-center rounded-xl text-stone-600 hover:bg-stone-200/60 transition">
+              <LogOut size={18} />
+            </button>
+          </div>
         </div>
       </header>
 
-      <main className="mx-auto max-w-7xl space-y-5 p-5 sm:p-8">
+      <main className="mx-auto max-w-7xl space-y-6 px-5 py-8">
         {/* Hero banner */}
         <section className="relative overflow-hidden rounded-2xl border border-stone-300 bg-[#1f3d2b] p-8 text-white shadow-sm sm:p-10">
           <div className="pointer-events-none absolute -mr-16 -mt-16 right-0 top-0 h-64 w-64 rounded-full bg-[#b8923a]/10" />

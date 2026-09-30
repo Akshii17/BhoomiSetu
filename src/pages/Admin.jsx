@@ -266,63 +266,69 @@ export default function Admin({ user: userProp, onLogout: logoutProp }) {
   const stCls = { published: "bg-emerald-100 text-emerald-800", pending: "bg-amber-100 text-amber-800", flagged: "bg-red-100 text-red-800" };
 
   return (
-    <div className="min-h-screen bg-[#f4efe6] font-['Public_Sans',sans-serif] text-[#26282b] lg:grid lg:grid-cols-[260px_1fr]">
+    <div className="min-h-screen bg-[#f4efe6] font-['Public_Sans',sans-serif] text-[#26282b]">
       <style>{`@import url('https://fonts.googleapis.com/css2?family=Newsreader:opsz,wght@6..72,500;6..72,600&family=Public+Sans:wght@400;500;600&display=swap');`}</style>
 
-      {/* sidebar (top bar on phones) */}
-      <aside className="flex flex-col border-r border-[#1f3d2b]/20 bg-[#1f3d2b] text-white lg:sticky lg:top-0 lg:h-screen">
-        <div className="flex items-center justify-between gap-2.5 p-4 lg:p-5 border-b border-white/10">
+      {/* Top Header */}
+      <header className="sticky top-0 z-40 border-b border-[#1f3d2b]/15 bg-[#f4efe6]/95 backdrop-blur">
+        <div className="mx-auto flex max-w-7xl items-center justify-between px-5 py-3">
           <div className="flex items-center gap-2.5">
-            <span className="grid h-9 w-9 place-items-center rounded-lg bg-[#b8923a] text-[#1f3d2b] font-bold"><Landmark size={18} /></span>
-            <div>
-              <p className="font-['Newsreader',serif] text-xl font-semibold leading-none text-[#faf7f1]">Bhoomi</p>
-              <p className="mt-1 text-xs text-[#d2b067]">Admin Control Room</p>
-            </div>
+            <span className="grid h-9 w-9 place-items-center rounded-md bg-[#1f3d2b] text-[#d2b067]"><Landmark size={18} /></span>
+            <span className="font-['Newsreader',serif] text-2xl font-semibold text-[#1f3d2b]">Bhoomi</span>
+            <span className="rounded-full bg-[#e3ecdf] px-3 py-0.5 text-xs font-semibold text-[#1f3d2b]">Admin Control Room</span>
           </div>
-          <div className="flex items-center gap-1.5 lg:hidden">
-            <button type="button" onClick={() => window.dispatchEvent(new CustomEvent("open-bhoomi-ai"))} className="flex items-center gap-1 rounded-lg bg-[#b8923a] px-2 py-1.5 text-xs font-semibold text-[#1f3d2b]"><Sparkles size={13} /> AI</button>
-            <button onClick={onLogout} aria-label="Sign out" className="rounded-lg bg-white/10 p-2 hover:bg-white/20"><LogOut size={16} /></button>
-          </div>
-        </div>
 
-        <div className="hidden px-4 py-3 lg:block">
-          <button type="button" onClick={() => window.dispatchEvent(new CustomEvent("open-bhoomi-ai"))} className="flex w-full items-center justify-center gap-2 rounded-xl bg-[#b8923a] px-3.5 py-2.5 text-sm font-semibold text-[#1f3d2b] hover:bg-[#c9a24a] transition shadow-sm">
-            <Sparkles size={16} /> Bhoomi AI Copilot
-          </button>
-        </div>
-
-        <nav className="flex gap-1 overflow-x-auto px-3 pb-3 lg:flex-1 lg:flex-col lg:overflow-visible lg:pb-0">
-          {NAV.map(([id, label, Icon]) => (
-            <button
-              key={id}
-              onClick={() => setTab(id)}
-              aria-current={tab === id ? "page" : undefined}
-              className={cx(
-                "flex shrink-0 items-center gap-3 rounded-xl px-3.5 py-2.5 text-sm font-medium transition",
-                tab === id
-                  ? "bg-[#b8923a]/25 text-[#ffd166] border-l-4 border-[#b8923a] font-semibold"
-                  : "text-stone-300 hover:bg-white/10 hover:text-white"
-              )}
-            >
-              <Icon size={17} />
-              {label}
-              {badge[id] > 0 && <span className="ml-auto rounded-full bg-[#b8923a] px-2 text-xs font-bold text-[#1f3d2b]">{badge[id]}</span>}
+          <div className="flex items-center gap-3">
+            <button type="button" onClick={() => window.dispatchEvent(new CustomEvent("open-bhoomi-ai"))} className="flex items-center gap-1.5 rounded-lg border border-[#b8923a]/40 bg-[#faf7f1] px-3.5 py-2 text-sm font-semibold text-[#1f3d2b] hover:bg-[#b8923a]/15 transition">
+              <Sparkles size={15} className="text-[#b8923a]" /> Bhoomi AI
             </button>
-          ))}
-        </nav>
-
-        <div className="hidden border-t border-white/10 p-4 lg:block">
-          <p className="truncate text-sm font-medium text-stone-200">{user.name}</p>
-          <p className="truncate text-xs text-stone-400">{user.email}</p>
-          <button onClick={onLogout} className="mt-3 flex w-full items-center justify-center gap-2 rounded-xl border border-white/10 bg-white/5 py-2 text-sm font-semibold text-stone-200 hover:bg-white/10 transition"><LogOut size={15} />Sign out</button>
+            <div className="hidden text-right sm:block">
+              <p className="text-sm font-medium text-stone-900">{user.name}</p>
+              <p className="text-xs text-stone-500">Admin Clearance Level 4</p>
+            </div>
+            <button onClick={onLogout} aria-label="Sign out" title="Sign out" className="grid h-10 w-10 place-items-center rounded-xl text-stone-600 hover:bg-stone-200/60 transition">
+              <LogOut size={18} />
+            </button>
+          </div>
         </div>
-      </aside>
+      </header>
 
-      <main className="min-w-0 space-y-5 p-5 sm:p-8">
-        <header className="flex items-center justify-between">
-          <h1 className="font-['Newsreader',serif] text-3xl font-medium text-[#1f3d2b]">{NAV.find((n) => n[0] === tab)[1]}</h1>
+      <main className="mx-auto max-w-7xl space-y-6 px-5 py-8">
+        <div className="flex flex-wrap items-center justify-between gap-4 border-b border-stone-300 pb-4">
+          <div>
+            <p className="text-xs font-semibold uppercase tracking-wider text-[#b8923a]">System Administration</p>
+            <h1 className="mt-1 font-['Newsreader',serif] text-3xl font-medium text-[#1f3d2b]">{NAV.find((n) => n[0] === tab)[1]}</h1>
+          </div>
           <span className="rounded-full border border-stone-300 bg-white px-3 py-1 text-xs font-medium text-stone-600">Admin Clearance Level 4</span>
-        </header>
+        </div>
+
+        {/* Tab switcher */}
+        <div className="overflow-x-auto pb-1">
+          <div className="inline-flex gap-1 rounded-xl border border-stone-300 bg-[#ebe5d8] p-1" role="tablist">
+            {NAV.map(([id, label, Icon]) => (
+              <button
+                key={id}
+                role="tab"
+                aria-selected={tab === id}
+                onClick={() => setTab(id)}
+                className={cx(
+                  "flex shrink-0 items-center gap-2 rounded-lg px-3.5 py-2 text-sm font-medium transition",
+                  tab === id
+                    ? "bg-white text-[#1f3d2b] shadow-sm font-bold"
+                    : "text-stone-700 hover:text-[#1f3d2b]"
+                )}
+              >
+                <Icon size={16} />
+                {label}
+                {badge[id] > 0 && (
+                  <span className="ml-1 rounded-full bg-[#b8923a] px-1.5 py-0.5 text-[11px] font-bold text-[#1f3d2b]">
+                    {badge[id]}
+                  </span>
+                )}
+              </button>
+            ))}
+          </div>
+        </div>
 
         {/* ===== overview ===== */}
         {tab === "overview" && (

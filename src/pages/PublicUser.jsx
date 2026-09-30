@@ -1,10 +1,11 @@
 import { useEffect, useRef, useState } from "react";
+import { useNavigate } from "react-router-dom";
 import * as maplibregl from "maplibre-gl";
 import "maplibre-gl/dist/maplibre-gl.css";
 import { AreaChart, Area, PieChart, Pie, Cell, ResponsiveContainer, Tooltip } from "recharts";
 import {
   Landmark, Search, Sparkles, Layers, ArrowRight, MapPin, Thermometer, Droplets,
-  Loader2, Flag, Trophy, BookOpen, Scale, CloudRain, FolderKanban, TrendingUp, Send, CheckCircle2,
+  Loader2, Flag, Trophy, BookOpen, Scale, CloudRain, FolderKanban, TrendingUp, Send, CheckCircle2, LogOut,
 } from "lucide-react";
 import { BASEMAPS, baseStyle } from "../data/Studies";
 
@@ -48,7 +49,9 @@ function landUseFor(name) {
   ];
 }
 
-export default function PublicUser() {
+export default function PublicUser({ user, onLogout: logoutProp }) {
+  const nav = useNavigate();
+  const onLogout = logoutProp || (() => { localStorage.removeItem("bhoomi_user"); nav("/"); });
   const mapEl = useRef(null), mapRef = useRef(null), markerRef = useRef(null), districtRef = useRef(null);
   const [base, setBase] = useState("satellite");
   const [overlays, setOverlays] = useState({ ndvi: false, heat: false });
@@ -146,11 +149,15 @@ export default function PublicUser() {
             {[["Map", "map"], ["Research", "research"], ["Innovation", "innovation"], ["Report an issue", "report"]].map(([l, id]) => (
               <button key={id} onClick={() => go(id)} className="hover:text-[#1f3d2b] font-medium transition">{l}</button>
             ))}
-            <button type="button" onClick={() => window.dispatchEvent(new CustomEvent("open-bhoomi-ai"))} className="flex items-center gap-1.5 rounded-lg border border-[#b8923a]/40 bg-[#faf7f1] px-3.5 py-1.5 text-xs font-semibold text-[#1f3d2b] hover:bg-[#b8923a]/15 transition">
-              <Sparkles size={14} className="text-[#b8923a]" /> Bhoomi AI
-            </button>
           </nav>
-          <button className="rounded-lg bg-[#1f3d2b] px-4 py-2 text-sm font-medium text-white hover:bg-[#2a5239] transition">Sign in</button>
+          <div className="flex items-center gap-3">
+            <button type="button" onClick={() => window.dispatchEvent(new CustomEvent("open-bhoomi-ai"))} className="flex items-center gap-1.5 rounded-lg border border-[#b8923a]/40 bg-[#faf7f1] px-3.5 py-2 text-sm font-semibold text-[#1f3d2b] hover:bg-[#b8923a]/15 transition">
+              <Sparkles size={15} className="text-[#b8923a]" /> Bhoomi AI
+            </button>
+            <button onClick={onLogout} aria-label="Sign out" title="Sign out" className="grid h-10 w-10 place-items-center rounded-xl text-stone-600 hover:bg-stone-200/60 transition">
+              <LogOut size={18} />
+            </button>
+          </div>
         </div>
       </header>
 

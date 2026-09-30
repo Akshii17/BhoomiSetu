@@ -49,8 +49,9 @@ const STATUS = {
 };
 const EMPTY = { kind: KINDS[0], study: "1", newStudy: "", title: "", authors: "", state: STATES[0], tags: "", access: "public", description: "", file: null };
 
-export default function Researcher({ user }) {
+export default function Researcher({ user, onLogout: logoutProp }) {
   const nav = useNavigate();
+  const onLogout = logoutProp || (() => { localStorage.removeItem("bhoomi_user"); nav("/"); });
   const [uploads, setUploads] = useState([
     { id: "a", title: "Assam flood parcels 2019 to 2024", kind: "Dataset", study: "Flood-prone parcels in Assam", status: "Indexed", date: "yesterday" },
     { id: "b", title: "Karnataka land dispute tribunal analysis", kind: "Research paper", study: "Dispute resolution times, Karnataka", status: "Published", date: "12 Sep" },
@@ -150,7 +151,7 @@ export default function Researcher({ user }) {
             <button onClick={() => setOpen(true)} className="flex items-center gap-2 rounded-lg bg-[#1f3d2b] px-4 py-2 text-sm font-semibold text-white hover:bg-[#2a5239] transition">
               <Plus size={16} /> Add research
             </button>
-            <button onClick={() => nav("/")} aria-label="Sign out" className="grid h-10 w-10 place-items-center rounded-xl text-stone-600 hover:bg-stone-200/60 transition"><LogOut size={18} /></button>
+            <button onClick={onLogout} aria-label="Sign out" title="Sign out" className="grid h-10 w-10 place-items-center rounded-xl text-stone-600 hover:bg-stone-200/60 transition"><LogOut size={18} /></button>
           </div>
         </div>
       </header>

@@ -73,8 +73,9 @@ const MODALS = {
 
 const input = "mt-1.5 w-full rounded-xl border border-stone-300 bg-white px-3 py-2.5 text-sm outline-none focus:border-[#1f3d2b] focus:ring-2 focus:ring-[#1f3d2b]/15";
 
-export default function PolicyMaker({ user }) {
+export default function PolicyMaker({ user, onLogout: logoutProp }) {
   const nav = useNavigate();
+  const onLogout = logoutProp || (() => { localStorage.removeItem("bhoomi_user"); nav("/"); });
   const [scen, setScen] = useState(SCEN);
   const [a, setA] = useState(SCEN[0].id);
   const [b, setB] = useState(SCEN[1].id);
@@ -170,7 +171,7 @@ export default function PolicyMaker({ user }) {
             {[["challenge", Megaphone, "Post challenge"], ["baseline", Target, "Set baseline"], ["report", FileText, "Generate report"]].map(([m, I, l]) => (
               <button key={m} onClick={() => openModal(m)} className="flex items-center gap-2 rounded-lg border border-stone-300 bg-white px-3.5 py-2 text-sm font-semibold text-stone-700 hover:bg-[#faf7f1] transition"><I size={15} />{l}</button>
             ))}
-            <button onClick={() => nav("/")} aria-label="Sign out" className="grid h-10 w-10 place-items-center rounded-xl text-stone-600 hover:bg-stone-200/60 transition"><LogOut size={18} /></button>
+            <button onClick={onLogout} aria-label="Sign out" title="Sign out" className="grid h-10 w-10 place-items-center rounded-xl text-stone-600 hover:bg-stone-200/60 transition"><LogOut size={18} /></button>
           </div>
         </div>
       </header>

@@ -74,8 +74,9 @@ function Avatar({ name, size = "h-8 w-8" }) {
   return <span className={`grid ${size} place-items-center rounded-full bg-[#1f3d2b] text-[11px] font-semibold text-[#f4efe6]`}>{ini}</span>;
 }
 
-export default function Institution() {
+export default function Institution({ user, onLogout: logoutProp }) {
   const nav = useNavigate();
+  const onLogout = logoutProp || (() => { localStorage.removeItem("bhoomi_user"); nav("/"); });
   const [tab, setTab] = useState("Overview");
   const [years, setYears] = useState(YEARS0);
   const [pubs, setPubs] = useState(PUBS0);
@@ -130,7 +131,7 @@ export default function Institution() {
           <span className="rounded-full bg-[#e3ecdf] px-3 py-0.5 text-xs font-semibold text-[#1f3d2b]">Academic Institution</span>
           <div className="ml-auto flex items-center gap-2">
             <button type="button" onClick={() => window.dispatchEvent(new CustomEvent("open-bhoomi-ai"))} className="flex items-center gap-1.5 rounded-lg border border-[#b8923a]/40 bg-[#faf7f1] px-3.5 py-2 text-sm font-semibold text-[#1f3d2b] hover:bg-[#b8923a]/15 transition"><Sparkles size={15} className="text-[#b8923a]" />Bhoomi AI</button>
-            <button onClick={() => nav("/")} aria-label="Sign out" className="grid h-10 w-10 place-items-center rounded-xl text-stone-600 hover:bg-stone-200/60 transition"><LogOut size={18} /></button>
+            <button onClick={onLogout} aria-label="Sign out" title="Sign out" className="grid h-10 w-10 place-items-center rounded-xl text-stone-600 hover:bg-stone-200/60 transition"><LogOut size={18} /></button>
           </div>
         </div>
       </header>
