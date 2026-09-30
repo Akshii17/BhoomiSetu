@@ -5,7 +5,7 @@ import { PieChart, Pie, Cell, BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveCo
 import { ROLES, REGISTERABLE } from "../roles";
 import * as maplibregl from "maplibre-gl";
 import "maplibre-gl/dist/maplibre-gl.css";
-import { STUDIES, FACETS, REGIONS, HIGHWAYS, RAIL, MAP_LAYERS, BASEMAPS, baseStyle } from "../data/Studies";
+import { STUDIES, FACETS, REGIONS, HIGHWAYS, RAIL, MAP_LAYERS, BASEMAPS, baseStyle } from "../data/studies";
 
 const G = "#1f3d2b", GOLD = "#b8923a", INK = "#26282b", LINEN = "#f4efe6";
 const serif = "font-['Newsreader',serif]";
@@ -290,7 +290,7 @@ function GIS() {
               <p className="mt-5 text-xs text-[#9fb0a2]">Region shading follows the first active land-use, climate, dispute or project layer.</p>
             </div>
             <div className="relative min-h-[480px] bg-[#1b2a21]">
-              <div ref={box} className="absolute inset-0" />
+              <div ref={box} style={{ position: "absolute", inset: 0, width: "100%", height: "100%" }} />
               <div className="pointer-events-none absolute left-3 top-3 max-w-[250px] rounded-lg bg-[#1b2a21]/90 p-3 text-xs text-[#f4efe6]" aria-live="polite">
                 {!tool && "Click a region to see its profile."}
                 {tool === "buffer" && `Buffer: click the map to draw a ${kmBuf} km zone.`}
@@ -320,8 +320,10 @@ function GIS() {
                   <div><dt className="text-xs text-[#d2b067]">Disputes</dt><dd>{region.disputes.toLocaleString()} recorded cases</dd></div>
                 </dl>
                 <h4 className="mt-3 text-xs font-semibold text-[#d2b067]">Related studies</h4>
-                <ul className="mt-1 space-y-1.5">{region.studies.map((id) => { const s = STUDIES.find((x) => x.id === id); return (
-                  <li key={id}><button onClick={() => nav(`/study/${id}`)} className="flex w-full items-start gap-2 rounded-md bg-[#2f4538] p-2 text-left text-xs hover:bg-[#3a5345]"><FileText size={14} className="mt-0.5 shrink-0 text-[#d2b067]" />{s.title}</button></li>); })}</ul>
+                <ul className="mt-1 space-y-1.5">{region.studies.map((id) => {
+                  const s = STUDIES.find((x) => x.id === id); return (
+                    <li key={id}><button onClick={() => nav(`/study/${id}`)} className="flex w-full items-start gap-2 rounded-md bg-[#2f4538] p-2 text-left text-xs hover:bg-[#3a5345]"><FileText size={14} className="mt-0.5 shrink-0 text-[#d2b067]" />{s.title}</button></li>);
+                })}</ul>
               </>)}
             </div>
           </div>
