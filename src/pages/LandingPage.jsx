@@ -3,7 +3,9 @@ import { useNavigate } from "react-router-dom";
 import { Landmark, LogIn, UserPlus, Mail, Lock, User, Building2, Search, Lock as LockIcon, ArrowRight, X, Sparkles, Ruler, Hexagon, Flame, SplitSquareHorizontal, RotateCcw, CircleDot, Send, Layers, FileText, Menu } from "lucide-react";
 import { PieChart, Pie, Cell, BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer } from "recharts";
 import { ROLES, REGISTERABLE } from "../roles";
-import { STUDIES, FACETS, REGIONS, HIGHWAYS, RAIL, MAP_LAYERS } from "../data/studies";
+import * as maplibregl from "maplibre-gl";
+import "maplibre-gl/dist/maplibre-gl.css";
+import { STUDIES, FACETS, REGIONS, HIGHWAYS, RAIL, MAP_LAYERS, BASEMAPS, baseStyle } from "../data/Studies";
 
 const G = "#1f3d2b", GOLD = "#b8923a", INK = "#26282b", LINEN = "#f4efe6";
 const serif = "font-['Newsreader',serif]";
@@ -136,15 +138,31 @@ function Repository() {
   );
 }
 
-/* ---------------- GIS Explorer ---------------- */
+/* ---------------- GIS Explorer (MapLibre) ---------------- */
 const TOOLS = [["buffer", "Buffer", CircleDot], ["dist", "Distance", Ruler], ["area", "Area", Hexagon], ["hot", "Hotspot", Flame], ["cmp", "Before / After", SplitSquareHorizontal]];
 const EXAMPLES = ["Show agricultural land within 5 km of highways", "Show disputed land near Mumbai", "Show urban expansion from 2020 to 2025"];
-const offs = [[-28, -18], [22, -26], [30, 20], [-20, 26], [4, 4]];
-const mix = (hex, t) => { const n = parseInt(hex.slice(1), 16); const c = [n >> 16, (n >> 8) & 255, n & 255]; const base = [236, 228, 212]; return `rgb(${c.map((v, i) => Math.round(base[i] + (v - base[i]) * t)).join(",")})`; };
+const HOME = { center: [78.96, 22.59], zoom: 3.9 };
+const offs = [[-1.0, -0.6], [0.8, -0.9], [1.1, 0.7], [-0.7, 0.9], [0.1, 0.1]];
+const MUMBAI = [[72.88, 19.07], [73.05, 19.25], [72.95, 18.92], [73.18, 19.05]];
+const R = 6371;
+const rad = (d) => (d * Math.PI) / 180;
+const hav = (a, b) => { const dLat = rad(b[1] - a[1]), dLon = rad(b[0] - a[0]); const h = Math.sin(dLat / 2) ** 2 + Math.cos(rad(a[1])) * Math.cos(rad(b[1])) * Math.sin(dLon / 2) ** 2; return 2 * R * Math.asin(Math.sqrt(h)); };
+const circle = (c, km) => ({ type: "Polygon", coordinates: [[...Array(65)].map((_, i) => { const t = (i / 64) * 2 * Math.PI; return [c[0] + (km / (111.32 * Math.cos(rad(c[1])))) * Math.cos(t), c[1] + (km / 110.57) * Math.sin(t)]; })] });
+const polyKm2 = (p) => { const lat0 = p.reduce((s, q) => s + q[1], 0) / p.length; const xy = p.map((q) => [q[0] * 111.32 * Math.cos(rad(lat0)), q[1] * 110.57]); return Math.abs(xy.reduce((s, q, i) => { const n = xy[(i + 1) % xy.length]; return s + q[0] * n[1] - n[0] * q[1]; }, 0)) / 2; };
+const fc = (features) => ({ type: "FeatureCollection", features });
+const pt = (c, props = {}) => ({ type: "Feature", properties: props, geometry: { type: "Point", coordinates: c } });
+const DISP = fc(REGIONS.flatMap((r) => [...offs.slice(0, 2 + (r.m.disp > 60 ? 3 : 1)).map(([dx, dy]) => [r.ctr[0] + dx, r.ctr[1] + dy]), ...(r.id === "mh" ? MUMBAI : [])].map((c) => pt(c, { w: r.m.disp / 100 }))));
+const PROJ = fc(REGIONS.flatMap((r) => offs.slice(1, 2 + Math.round(r.m.proj / 40)).map(([dx, dy]) => pt([r.ctr[0] + dx * 0.8, r.ctr[1] + dy * 0.8 - 0.3]))));
+const REGION_FC = fc(REGIONS.map((r) => ({ type: "Feature", properties: { id: r.id, name: r.name, ...r.m }, geometry: { type: "Polygon", coordinates: [[...r.poly, r.poly[0]]] } })));
+const line = (c) => ({ type: "Feature", properties: {}, geometry: { type: "LineString", coordinates: c } });
 
 function GIS() {
   const nav = useNavigate();
-  const svg = useRef(null);
+  const box = useRef(null);
+  const mapRef = useRef(null);
+  const live = useRef({});
+  const [ready, setReady] = useState(false);
+  const [base, setBase] = useState("satellite");
   const [on, setOn] = useState(["agri"]);
   const [tool, setTool] = useState(null);
   const [pts, setPts] = useState([]);
@@ -154,28 +172,88 @@ function GIS() {
   const [q, setQ] = useState("");
   const [msg, setMsg] = useState("");
   const [corridor, setCorridor] = useState(false);
+  live.current = { tool, kmBuf };
   const flat = Object.values(MAP_LAYERS).flat();
   const choro = ["agri", "urban", "forest", "flood", "heat", "disp", "proj"].find((k) => on.includes(k));
-  const color = flat.find((l) => l[0] === choro)?.[2];
+  const color = flat.find((l) => l[0] === choro)?.[2] || "#1f5a3a";
   const region = REGIONS.find((r) => r.id === sel);
   const t = (year - 2015) / 10;
-  const val = (r) => (choro === "urban" && tool === "cmp" ? r.m.urban * (0.55 + 0.45 * t) : r.m[choro]);
+  const dist = pts.length === 2 ? Math.round(hav(pts[0], pts[1])) : null;
+  const areaKm = pts.length >= 3 ? Math.round(polyKm2(pts)) : null;
+
+  // create map once
+  useEffect(() => {
+    const map = new maplibregl.Map({ container: box.current, style: baseStyle(), ...HOME, minZoom: 3 });
+    mapRef.current = map;
+    map.addControl(new maplibregl.NavigationControl({ showCompass: false }), "bottom-right");
+    map.addControl(new maplibregl.ScaleControl({ unit: "metric" }), "bottom-left");
+    map.on("load", () => {
+      const src = (id, data) => map.addSource(id, { type: "geojson", data });
+      src("regions", REGION_FC); src("hwy", fc(HIGHWAYS.map(line))); src("rail", fc(RAIL.map(line)));
+      src("disp", DISP); src("proj", PROJ); src("draw", fc([]));
+      map.addLayer({ id: "regions-fill", type: "fill", source: "regions", paint: { "fill-color": "#1f5a3a", "fill-opacity": 0.1 } });
+      map.addLayer({ id: "regions-line", type: "line", source: "regions", paint: { "line-color": "#f4efe6", "line-width": 1.5 } });
+      map.addLayer({ id: "regions-hl", type: "line", source: "regions", filter: ["==", ["get", "id"], ""], paint: { "line-color": "#b8923a", "line-width": 4 } });
+      map.addLayer({ id: "hwy-corridor", type: "line", source: "hwy", layout: { visibility: "none", "line-cap": "round" }, paint: { "line-color": "#b8923a", "line-opacity": 0.5, "line-width": ["interpolate", ["exponential", 2], ["zoom"], 3, 0.55, 12, 283] } }); // true 5 km each side
+      map.addLayer({ id: "hwy-line", type: "line", source: "hwy", layout: { visibility: "none" }, paint: { "line-color": "#ffffff", "line-width": 2.5 } });
+      map.addLayer({ id: "rail-line", type: "line", source: "rail", layout: { visibility: "none" }, paint: { "line-color": "#e8d9a8", "line-width": 2.5, "line-dasharray": [2, 1.5] } });
+      map.addLayer({ id: "disp-heat", type: "heatmap", source: "disp", layout: { visibility: "none" }, paint: { "heatmap-weight": ["get", "w"], "heatmap-radius": 45, "heatmap-intensity": 1.2, "heatmap-opacity": 0.8 } });
+      map.addLayer({ id: "disp-pt", type: "circle", source: "disp", layout: { visibility: "none" }, paint: { "circle-radius": 5.5, "circle-color": "#c2303f", "circle-stroke-color": "#fff", "circle-stroke-width": 1.5 } });
+      map.addLayer({ id: "proj-pt", type: "circle", source: "proj", layout: { visibility: "none" }, paint: { "circle-radius": 6, "circle-color": "#b8923a", "circle-stroke-color": "#fff", "circle-stroke-width": 1.5 } });
+      map.addLayer({ id: "draw-fill", type: "fill", source: "draw", filter: ["==", ["geometry-type"], "Polygon"], paint: { "fill-color": "#b8923a", "fill-opacity": 0.3 } });
+      map.addLayer({ id: "draw-line", type: "line", source: "draw", filter: ["in", ["geometry-type"], ["literal", ["Polygon", "LineString"]]], paint: { "line-color": "#ffd166", "line-width": 2.5 } });
+      map.addLayer({ id: "draw-pt", type: "circle", source: "draw", filter: ["==", ["geometry-type"], "Point"], paint: { "circle-radius": 5, "circle-color": "#26282b", "circle-stroke-color": "#fff", "circle-stroke-width": 2 } });
+      setReady(true);
+    });
+    map.on("click", (e) => {
+      const { tool: tl } = live.current;
+      if (!tl || tl === "hot" || tl === "cmp") {
+        const f = map.queryRenderedFeatures(e.point, { layers: ["regions-fill"] })[0];
+        setSel(f ? f.properties.id : null);
+        return;
+      }
+      const c = [e.lngLat.lng, e.lngLat.lat];
+      setPts((a) => (tl === "buffer" ? [c] : tl === "dist" ? (a.length >= 2 ? [c] : [...a, c]) : [...a, c]));
+    });
+    return () => map.remove();
+  }, []);
+
+  // basemap + layer visibility + region shading
+  useEffect(() => {
+    const m = mapRef.current; if (!ready) return;
+    Object.keys(BASEMAPS).forEach((k) => m.setLayoutProperty("base-" + k, "visibility", k === base ? "visible" : "none"));
+    const vis = (id, v) => m.setLayoutProperty(id, "visibility", v ? "visible" : "none");
+    vis("hwy-line", on.includes("hwy") || corridor); vis("hwy-corridor", corridor); vis("rail-line", on.includes("rail"));
+    vis("disp-pt", on.includes("disp")); vis("proj-pt", on.includes("proj")); vis("disp-heat", tool === "hot");
+    const v = choro === "urban" && tool === "cmp" ? ["*", ["get", "urban"], 0.55 + 0.45 * t] : ["get", choro || "agri"];
+    m.setPaintProperty("regions-fill", "fill-color", ["interpolate", ["linear"], v, 0, "#f4efe6", 100, color]);
+    m.setPaintProperty("regions-fill", "fill-opacity", choro ? 0.62 : 0.08);
+  }, [ready, base, on, corridor, tool, choro, color, t]);
+
+  // selection highlight
+  useEffect(() => { if (ready) mapRef.current.setFilter("regions-hl", ["==", ["get", "id"], sel || ""]); }, [ready, sel]);
+
+  // measurement drawings
+  useEffect(() => {
+    if (!ready) return;
+    const f = pts.map((c) => pt(c));
+    if (tool === "buffer" && pts[0]) f.push({ type: "Feature", properties: {}, geometry: circle(pts[0], kmBuf) });
+    if (tool === "dist" && pts.length === 2) f.push(line(pts));
+    if (tool === "area" && pts.length >= 3) f.push({ type: "Feature", properties: {}, geometry: { type: "Polygon", coordinates: [[...pts, pts[0]]] } });
+    mapRef.current.getSource("draw").setData(fc(f));
+  }, [ready, pts, tool, kmBuf]);
+
+  useEffect(() => { if (mapRef.current) mapRef.current.getCanvas().style.cursor = ["buffer", "dist", "area"].includes(tool) ? "crosshair" : ""; }, [tool]);
+
   const toggleLayer = (k) => setOn((s) => (s.includes(k) ? s.filter((x) => x !== k) : [...s, k]));
-  const reset = () => { setTool(null); setPts([]); setSel(null); setOn(["agri"]); setYear(2025); setCorridor(false); setMsg(""); setQ(""); };
-  const pick = (k) => { setTool(tool === k ? null : k); setPts([]); if (k === "cmp") { setOn((s) => [...new Set([...s, "urban"])]); } };
-  const coords = (e) => { const r = svg.current.getBoundingClientRect(); return [((e.clientX - r.left) / r.width) * 600, ((e.clientY - r.top) / r.height) * 470]; };
-  const onMap = (e) => {
-    if (!tool || tool === "hot" || tool === "cmp") return;
-    const p = coords(e);
-    setPts((a) => (tool === "buffer" ? [p] : tool === "dist" ? (a.length >= 2 ? [p] : [...a, p]) : [...a, p]));
-  };
-  const dist = pts.length === 2 ? Math.round(Math.hypot(pts[0][0] - pts[1][0], pts[0][1] - pts[1][1]) * 6) : null;
-  const areaKm = pts.length >= 3 ? Math.round(Math.abs(pts.reduce((s, p, i) => { const n = pts[(i + 1) % pts.length]; return s + p[0] * n[1] - n[0] * p[1]; }, 0)) / 2 * 36) : null;
+  const fly = (o) => mapRef.current?.flyTo({ duration: 1400, ...o });
+  const reset = () => { setTool(null); setPts([]); setSel(null); setOn(["agri"]); setYear(2025); setCorridor(false); setMsg(""); setQ(""); setBase("satellite"); fly(HOME); };
+  const pick = (k) => { setTool(tool === k ? null : k); setPts([]); if (k === "cmp") setOn((s) => [...new Set([...s, "urban"])]); };
   function runQuery(text) {
     const s = text.toLowerCase(); setQ(text); setPts([]);
-    if (s.includes("highway")) { setOn(["agri", "hwy"]); setCorridor(true); setTool(null); setMsg("Agricultural land within a 5 km highway corridor: about 41,300 km² across 4 regions, highest in Uttar Pradesh and Maharashtra. Corridor width is exaggerated on the map."); }
-    else if (s.includes("disput")) { setOn(["disp"]); setSel("mh"); setTool("hot"); setCorridor(false); setMsg("Maharashtra has 18,760 recorded land disputes; the densest cluster lies around the Mumbai–Thane belt."); }
-    else if (s.includes("urban")) { setOn(["urban"]); setTool("cmp"); setYear(2025); setCorridor(false); setMsg("Built-up area grew fastest in Maharashtra and Karnataka between 2020 and 2025. Drag the year slider to compare."); }
+    if (s.includes("highway")) { setOn(["agri", "hwy"]); setCorridor(true); setTool(null); fly({ center: [76.5, 19.8], zoom: 6 }); setMsg("Agricultural land within 5 km of highways is highlighted in gold (corridor drawn to true scale, zoom in to see it). Estimated 41,300 km² across 4 regions, highest in Uttar Pradesh and Maharashtra."); }
+    else if (s.includes("disput")) { setOn(["disp"]); setSel("mh"); setTool("hot"); setCorridor(false); fly({ center: [72.95, 19.1], zoom: 8.2 }); setMsg("Maharashtra has 18,760 recorded land disputes; the densest cluster lies around the Mumbai–Thane belt."); }
+    else if (s.includes("urban")) { setOn(["urban"]); setTool("cmp"); setYear(2025); setCorridor(false); fly(HOME); setMsg("Built-up area grew fastest in Maharashtra and Karnataka between 2020 and 2025. Drag the year slider to compare with 2015."); }
     else setMsg("Try an example query below. This demo understands highways, disputes and urban expansion.");
   }
   const lu = region && ["Agriculture", "Urban", "Forest", "Other"].map((n, i) => ({ n, v: region.lu[i] }));
@@ -185,19 +263,22 @@ function GIS() {
       <div className="mx-auto max-w-[1500px]">
         <p className="text-sm font-semibold text-[#d2b067]">Public GIS Map Explorer</p>
         <h2 className={`${serif} mt-1 text-4xl font-semibold`}>Explore land on the map</h2>
-        <p className="mt-2 max-w-2xl text-[#cfd6c9]">Toggle layers, measure, find hotspots, compare years and ask the map a question. Click any region for its profile. Demo data shown.</p>
+        <p className="mt-2 max-w-2xl text-[#cfd6c9]">Switch the base map, toggle layers, measure, find hotspots, compare years and ask the map a question. Click a region for its profile. Regional figures are demo data.</p>
         <div className="mt-6 overflow-hidden rounded-xl border border-[#3a4d40] bg-[#23352a]">
           <div className="flex flex-wrap items-center gap-2 border-b border-[#3a4d40] p-3">
             {TOOLS.map(([k, label, I]) => (
               <button key={k} onClick={() => pick(k)} aria-pressed={tool === k} className={`flex items-center gap-1.5 rounded-md px-3 py-1.5 text-sm ${tool === k ? "bg-[#b8923a] font-medium text-[#1b2a21]" : "bg-[#2f4538] hover:bg-[#3a5345]"}`}><I size={15} />{label}</button>
             ))}
-            {tool === "buffer" && <select value={kmBuf} onChange={(e) => setKmBuf(+e.target.value)} aria-label="Buffer radius" className="rounded-md bg-[#2f4538] px-2 py-1.5 text-sm">{[25, 60, 120].map((k) => <option key={k} value={k}>{k} km</option>)}</select>}
+            {tool === "buffer" && <select value={kmBuf} onChange={(e) => setKmBuf(+e.target.value)} aria-label="Buffer radius" className="rounded-md bg-[#2f4538] px-2 py-1.5 text-sm">{[5, 25, 60, 120].map((k) => <option key={k} value={k}>{k} km</option>)}</select>}
             {tool === "cmp" && <label className="flex items-center gap-2 text-sm">2015<input type="range" min="2015" max="2025" value={year} onChange={(e) => setYear(+e.target.value)} className="accent-[#b8923a]" />{year}</label>}
             <button onClick={reset} className="ml-auto flex items-center gap-1.5 rounded-md bg-[#2f4538] px-3 py-1.5 text-sm hover:bg-[#3a5345]"><RotateCcw size={15} />Reset</button>
           </div>
           <div className="grid lg:grid-cols-[230px_1fr_310px]">
             <div className="border-b border-[#3a4d40] p-4 lg:border-b-0 lg:border-r">
               <h3 className="flex items-center gap-2 text-sm font-semibold"><Layers size={15} />Layers</h3>
+              <div className="mt-3 grid grid-cols-3 rounded-md bg-[#1b2a21] p-0.5 text-xs">
+                {Object.entries(BASEMAPS).map(([k, c]) => <button key={k} onClick={() => setBase(k)} className={`rounded py-1.5 ${base === k ? "bg-[#b8923a] font-medium text-[#1b2a21]" : "text-[#cfd6c9]"}`}>{c.label}</button>)}
+              </div>
               {Object.entries(MAP_LAYERS).map(([g, ls]) => (
                 <div key={g} className="mt-4"><p className="text-xs font-semibold text-[#d2b067]">{g}</p>
                   {ls.map(([k, name, c]) => (
@@ -208,35 +289,14 @@ function GIS() {
               ))}
               <p className="mt-5 text-xs text-[#9fb0a2]">Region shading follows the first active land-use, climate, dispute or project layer.</p>
             </div>
-            <div className="relative bg-[#e9e2d0]">
-              <svg ref={svg} viewBox="0 0 600 470" className={`h-full min-h-[440px] w-full ${tool && tool !== "hot" && tool !== "cmp" ? "cursor-crosshair" : ""}`} onClick={onMap} role="img" aria-label="Schematic map of Indian states">
-                <defs><pattern id="grid" width="40" height="40" patternUnits="userSpaceOnUse"><path d="M40 0H0V40" fill="none" stroke="#d6cdb6" strokeWidth="1" /></pattern></defs>
-                <rect width="600" height="470" fill="url(#grid)" />
-                {REGIONS.map((r) => (
-                  <g key={r.id}>
-                    <polygon points={r.pts} fill={choro ? mix(color, Math.min(1, val(r) / 100) * 0.9 + 0.1) : "#d9d0ba"} stroke={sel === r.id ? GOLD : "#6b6a5c"} strokeWidth={sel === r.id ? 3 : 1.2} className="cursor-pointer" onClick={(e) => { if (!tool || tool === "hot" || tool === "cmp") { e.stopPropagation(); setSel(r.id); } }} />
-                    <text x={r.c[0]} y={r.c[1]} textAnchor="middle" fontSize="12" fill={INK} className="pointer-events-none" fontWeight="600">{r.name}</text>
-                  </g>
-                ))}
-                {(on.includes("hwy") || corridor) && HIGHWAYS.map((h, i) => <polyline key={i} points={h} fill="none" stroke={corridor ? "#b8923a" : INK} strokeOpacity={corridor ? 0.45 : 1} strokeWidth={corridor ? 16 : 2.5} strokeLinecap="round" />)}
-                {on.includes("hwy") && corridor && HIGHWAYS.map((h, i) => <polyline key={"l" + i} points={h} fill="none" stroke={INK} strokeWidth="2" />)}
-                {on.includes("rail") && RAIL.map((h, i) => <polyline key={i} points={h} fill="none" stroke="#6b5b3a" strokeWidth="2.5" strokeDasharray="7 4" />)}
-                {on.includes("disp") && REGIONS.flatMap((r) => offs.slice(0, 2 + (r.m.disp > 60 ? 3 : 1)).map(([dx, dy], i) => <circle key={r.id + i} cx={r.c[0] + dx} cy={r.c[1] + dy + 14} r="5" fill="#8c2f39" stroke="#fff" />))}
-                {on.includes("proj") && REGIONS.flatMap((r) => offs.slice(1, 2 + Math.round(r.m.proj / 40)).map(([dx, dy], i) => <rect key={r.id + i} x={r.c[0] + dx - 5} y={r.c[1] + dy + 14 - 5} width="10" height="10" fill={GOLD} stroke="#fff" transform={`rotate(45 ${r.c[0] + dx} ${r.c[1] + dy + 14})`} />))}
-                {tool === "hot" && REGIONS.map((r) => <circle key={r.id} cx={r.c[0]} cy={r.c[1] + 10} r={8 + r.m.disp * 0.45} fill="#d1432f" fillOpacity={0.14 + r.m.disp / 400} className="pointer-events-none" />)}
-                {tool === "buffer" && pts[0] && <circle cx={pts[0][0]} cy={pts[0][1]} r={kmBuf / 6} fill={GOLD} fillOpacity=".3" stroke={GOLD} strokeWidth="2" />}
-                {tool === "dist" && pts.length === 2 && <polyline points={pts.map((p) => p.join(",")).join(" ")} stroke="#8c2f39" strokeWidth="2.5" strokeDasharray="5 3" />}
-                {tool === "area" && pts.length > 1 && <polygon points={pts.map((p) => p.join(",")).join(" ")} fill={GOLD} fillOpacity=".3" stroke={GOLD} strokeWidth="2" />}
-                {pts.map((p, i) => <circle key={i} cx={p[0]} cy={p[1]} r="4" fill={INK} stroke="#fff" strokeWidth="1.5" />)}
-                <g transform="translate(560 40)"><circle r="18" fill="#faf7f1" stroke={INK} /><path d="M0-13L5 4H-5Z" fill={INK} /><text y="15" fontSize="8" textAnchor="middle" fill={INK}>N</text></g>
-                <text x="12" y="462" fontSize="10" fill="#5b5a4c">Schematic map, not to scale · 1 cm ≈ 600 km</text>
-              </svg>
-              <div className="absolute left-3 top-3 max-w-[240px] rounded-lg bg-[#1b2a21]/90 p-3 text-xs text-[#f4efe6]" aria-live="polite">
+            <div className="relative min-h-[480px] bg-[#1b2a21]">
+              <div ref={box} className="absolute inset-0" />
+              <div className="pointer-events-none absolute left-3 top-3 max-w-[250px] rounded-lg bg-[#1b2a21]/90 p-3 text-xs text-[#f4efe6]" aria-live="polite">
                 {!tool && "Click a region to see its profile."}
                 {tool === "buffer" && `Buffer: click the map to draw a ${kmBuf} km zone.`}
                 {tool === "dist" && (dist ? `Distance: ${dist.toLocaleString()} km` : "Distance: click two points.")}
                 {tool === "area" && (areaKm ? `Area: ${areaKm.toLocaleString()} km²` : "Area: click three or more points.")}
-                {tool === "hot" && "Hotspot: dispute density, red is higher."}
+                {tool === "hot" && "Hotspot: dispute density, brighter is higher."}
                 {tool === "cmp" && `Urban built-up comparison, ${year} vs 2015.`}
               </div>
             </div>

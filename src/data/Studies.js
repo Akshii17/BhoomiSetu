@@ -32,7 +32,7 @@ const reg = (id, name, area, pts, c, lu, m, infra, projects, temp, rain, dispute
   infra, projects, temp, rain, disputes, studies,
 });
 
-export const REGIONS = [
+const RAW = [
   reg("rj", "Rajasthan", "342,239", "60,90 200,60 260,130 230,230 120,240 50,170", [150, 150], [38, 4, 8, 50], [18, 88, 52, 40], "4 national highways, 1,200 km rail corridor", ["Solar land bank survey", "Rural cadastral drone mapping"], "+1.4°C", "−11%", 12840, ["BH-2023-007", "BH-2023-026"]),
   reg("gj", "Gujarat", "196,024", "40,255 130,250 215,255 195,335 120,365 30,315", [120, 305], [52, 9, 6, 33], [42, 70, 38, 78], "GIFT City, Dholera SIR, 5 expressways", ["Dholera smart city", "Land consolidation pilot"], "+1.1°C", "−6%", 9120, ["BH-2024-019"]),
   reg("up", "Uttar Pradesh", "240,928", "270,80 420,70 470,130 400,190 290,180 250,130", [360, 130], [68, 7, 4, 21], [61, 66, 94, 55], "Ganga & Purvanchal Expressways", ["e-Mutation statewide rollout", "Ganga corridor land pooling"], "+0.9°C", "−4%", 31550, ["BH-2022-031", "BH-2025-037"]),
@@ -41,8 +41,37 @@ export const REGIONS = [
   reg("ka", "Karnataka", "191,791", "235,395 350,390 340,455 260,460", [295, 425], [56, 10, 20, 14], [22, 57, 41, 70], "Bengaluru–Mysuru Expressway, Peripheral Ring Road", ["Bhoomi-Kaveri integration", "Bengaluru lake buffer zones"], "+1.3°C", "−7%", 11080, ["BH-2021-003", "BH-2024-045"]),
 ];
 
-export const HIGHWAYS = ["60,200 160,190 280,170 420,150", "120,300 210,310 300,320 400,300", "300,200 300,320 290,420"];
-export const RAIL = ["70,120 180,170 270,250 300,330 290,430"];
+const GEO = {
+  rj: { ctr: [74.2, 26.6], poly: [[69.5,27.6],[70.3,25.0],[72.5,24.8],[74.5,23.5],[76.2,24.7],[78.2,26.0],[77.0,28.5],[75.5,30.1],[74.0,29.4],[72.0,28.5]] },
+  gj: { ctr: [71.6, 22.6], poly: [[68.2,23.7],[69.5,22.4],[70.5,20.9],[72.6,20.4],[73.8,21.0],[74.3,22.2],[73.5,24.2],[71.0,24.6],[69.5,24.3]] },
+  up: { ctr: [80.8, 26.8], poly: [[77.1,28.6],[78.5,30.0],[80.5,29.3],[81.5,28.8],[83.5,27.4],[84.6,27.0],[84.0,25.7],[83.3,24.2],[81.5,24.2],[79.5,25.0],[78.3,25.9],[77.5,26.7]] },
+  mh: { ctr: [76.5, 19.2], poly: [[72.7,20.0],[73.8,21.2],[75.5,21.3],[76.5,21.6],[78.5,21.8],[80.3,21.5],[80.9,19.9],[79.9,19.1],[79.5,18.5],[77.5,18.0],[77.2,17.0],[76.0,15.8],[74.3,15.8],[73.3,17.5]] },
+  od: { ctr: [84.5, 20.8], poly: [[81.4,19.9],[82.3,21.0],[83.2,22.3],[85.0,22.5],[86.6,22.0],[87.5,21.5],[86.9,20.3],[85.0,19.3],[84.3,18.6],[83.0,18.2],[82.0,18.9]] },
+  ka: { ctr: [76.3, 14.8], poly: [[74.1,15.0],[74.5,16.5],[75.6,17.8],[77.2,17.5],[77.6,16.0],[78.5,14.5],[78.0,12.8],[77.2,11.8],[76.0,11.6],[75.3,12.5],[74.6,13.6]] },
+};
+export const REGIONS = RAW.map((r) => ({ ...r, ...GEO[r.id] }));
+
+// Illustrative corridors in [lon, lat]
+export const HIGHWAYS = [
+  [[72.85,19.05],[73.85,18.5],[74.6,17.0],[75.7,14.5],[77.6,12.97]],
+  [[77.2,28.6],[75.8,26.9],[73.7,24.6],[72.6,23.0]],
+  [[77.2,28.6],[80.9,26.85],[83.0,25.3]],
+  [[72.9,19.2],[75.3,19.9],[77.5,20.5],[79.1,21.15]],
+];
+export const RAIL = [[[72.85,19.0],[73.2,22.3],[75.8,26.9],[77.2,28.6]], [[85.8,20.3],[84.9,19.3],[83.3,18.1]]];
+
+// Same tile sources used on the PublicUser map
+export const BASEMAPS = {
+  street: { label: "Street", max: 19, attr: "© OpenStreetMap contributors", tiles: ["https://tile.openstreetmap.org/{z}/{x}/{y}.png"] },
+  satellite: { label: "Satellite", max: 18, attr: "Esri, Maxar, Earthstar Geographics", tiles: ["https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}"] },
+  terrain: { label: "Terrain", max: 17, attr: "© OpenTopoMap (CC-BY-SA)", tiles: ["https://a.tile.opentopomap.org/{z}/{x}/{y}.png"] },
+};
+export const baseStyle = () => ({
+  version: 8,
+  sources: Object.fromEntries(Object.entries(BASEMAPS).map(([k, c]) => [k, { type: "raster", tiles: c.tiles, tileSize: 256, maxzoom: c.max, attribution: c.attr }])),
+  layers: Object.keys(BASEMAPS).map((k) => ({ id: "base-" + k, type: "raster", source: k, layout: { visibility: k === "satellite" ? "visible" : "none" } })),
+});
+
 export const MAP_LAYERS = {
   "Land Use": [["agri", "Agricultural land", "#7a8f3c"], ["urban", "Urban built-up", "#7b6a58"], ["forest", "Forest cover", "#1f5a3a"]],
   Climate: [["flood", "Flood risk", "#2f6f9a"], ["heat", "Heat stress", "#b4532a"]],

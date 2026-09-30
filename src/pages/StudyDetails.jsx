@@ -1,7 +1,25 @@
+import { useEffect, useRef } from "react";
+import * as maplibregl from "maplibre-gl";
+import "maplibre-gl/dist/maplibre-gl.css";
 import { useParams, useNavigate, Navigate } from "react-router-dom";
 import { ArrowLeft, Sparkles, Download, Lock, LogIn, FileText, MapPin } from "lucide-react";
 import { LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid } from "recharts";
-import { STUDIES, REGIONS } from "../data/studies";
+import { STUDIES, REGIONS, baseStyle } from "../data/Studies";
+
+function RegionMap({ region }) {
+  const box = useRef(null);
+  useEffect(() => {
+    const map = new maplibregl.Map({ container: box.current, style: baseStyle(), center: region.ctr, zoom: 5.2, attributionControl: { compact: true } });
+    map.addControl(new maplibregl.NavigationControl({ showCompass: false }), "bottom-right");
+    map.on("load", () => {
+      map.addSource("r", { type: "geojson", data: { type: "Feature", geometry: { type: "Polygon", coordinates: [[...region.poly, region.poly[0]]] } } });
+      map.addLayer({ id: "r-fill", type: "fill", source: "r", paint: { "fill-color": "#b8923a", "fill-opacity": 0.3 } });
+      map.addLayer({ id: "r-line", type: "line", source: "r", paint: { "line-color": "#ffd166", "line-width": 3 } });
+    });
+    return () => map.remove();
+  }, [region]);
+  return <div ref={box} className="mt-3 h-72 w-full overflow-hidden rounded-lg" role="img" aria-label={`${region.name} on satellite map`} />;
+}
 
 const serif = "font-['Newsreader',serif]";
 const METHOD = {
@@ -53,9 +71,7 @@ export default function StudyDetails() {
             </section>
             {region && <section className="rounded-xl border border-stone-300 bg-white p-6">
               <h2 className={`${serif} flex items-center gap-2 text-2xl font-semibold`}><MapPin size={20} className="text-[#b8923a]" />Study region: {region.name}</h2>
-              <svg viewBox="0 0 600 470" className="mt-3 h-56 w-full rounded-lg bg-[#e9e2d0]" role="img" aria-label={`${region.name} highlighted on schematic map`}>
-                {REGIONS.map((r) => <polygon key={r.id} points={r.pts} fill={r.id === region.id ? "#1f3d2b" : "#d9d0ba"} stroke="#6b6a5c" />)}
-              </svg>
+              <RegionMap region={region} />
               <p className="mt-2 text-sm text-stone-600">{region.area} km² · {region.infra}</p>
             </section>}
             <section className="rounded-xl border border-stone-300 bg-white p-6">
