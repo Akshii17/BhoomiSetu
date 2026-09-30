@@ -1,12 +1,13 @@
-
 import { useEffect, useMemo, useRef, useState } from "react";
 import {
   Landmark, LogOut, Search, Plus, Trophy, Calendar, Users, Copy, Play, Lock, Bookmark, Sparkles, FileText,
-  KeyRound, Check, X, Rocket, Layers, Briefcase, Loader2,
+  KeyRound, Check, X, Rocket, Layers, Briefcase, Loader2, MapPin, Globe,
 } from "lucide-react";
 import { ResponsiveContainer, LineChart, Line, XAxis, YAxis, Tooltip, CartesianGrid, BarChart, Bar, Legend } from "recharts";
+import * as maplibregl from "maplibre-gl";
 import "maplibre-gl/dist/maplibre-gl.css";
 import { ROLES } from "../roles";
+import MapLibreMap, { MapModal } from "../components/MapLibreMap";
 
 /* ---------------- mock data (swap for /api calls later) ---------------- */
 const SKILLS = ["Remote sensing", "GIS", "AI/ML", "IoT", "Blockchain", "Data engineering", "Legal tech", "Mobile apps"];
@@ -18,12 +19,14 @@ const CHALLENGES = [
   { id: 5, title: "Tamper-proof audit trail for land records", type: "Challenge", org: "NIC", prize: "₹4,00,000", days: 18, level: "Intermediate", tags: ["Blockchain", "Data engineering"] },
   { id: 6, title: "Climate-risk overlay for village parcels", type: "Hackathon", org: "NRSC", prize: "₹2,50,000", days: 25, level: "Intermediate", tags: ["GIS", "Remote sensing", "Data engineering"] },
 ].map((c) => ({ ...c, joined: false }));
+
 const PILOTS = [
-  { id: 1, title: "ULPIN parcel verification, Nashik", lead: "Revenue Dept., Maharashtra", months: 6, stage: "Recruiting partners", needs: ["GIS", "Data engineering"] },
-  { id: 2, title: "Drone survey of common land, Kutch", lead: "Gujarat Land Dept. and IIT Gandhinagar", months: 4, stage: "Recruiting partners", needs: ["Remote sensing", "IoT"] },
-  { id: 3, title: "Dispute triage assistant, Kerala", lead: "Kerala Revenue Dept.", months: 8, stage: "Shortlisting", needs: ["AI/ML", "Legal tech"] },
-  { id: 4, title: "Record digitisation quality checks, Bihar", lead: "Bihar Land Reforms Dept.", months: 5, stage: "Recruiting partners", needs: ["Mobile apps", "Data engineering"] },
+  { id: 1, title: "ULPIN parcel verification, Nashik", lead: "Revenue Dept., Maharashtra", months: 6, stage: "Recruiting partners", needs: ["GIS", "Data engineering"], coords: [73.79, 20.0], loc: "Nashik, Maharashtra" },
+  { id: 2, title: "Drone survey of common land, Kutch", lead: "Gujarat Land Dept. and IIT Gandhinagar", months: 4, stage: "Recruiting partners", needs: ["Remote sensing", "IoT"], coords: [69.86, 23.73], loc: "Kutch, Gujarat" },
+  { id: 3, title: "Dispute triage assistant, Kerala", lead: "Kerala Revenue Dept.", months: 8, stage: "Shortlisting", needs: ["AI/ML", "Legal tech"], coords: [76.27, 9.93], loc: "Ernakulam/Kochi, Kerala" },
+  { id: 4, title: "Record digitisation quality checks, Bihar", lead: "Bihar Land Reforms Dept.", months: 5, stage: "Recruiting partners", needs: ["Mobile apps", "Data engineering"], coords: [85.13, 25.60], loc: "Patna, Bihar" },
 ].map((p) => ({ ...p, applied: false }));
+
 const SUBS = [
   { id: 1, title: "Sentinel-2 field boundary extractor", to: "Parcel boundary matching", st: "Under review", on: "12 Sep 2026" },
   { id: 2, title: "Offline mutation tracker for village offices", to: "WhatsApp bot for mutation status", st: "Shortlisted", on: "4 Sep 2026" },
@@ -66,8 +69,8 @@ const ENDPOINTS = [
   { path: "/v1/projects?status=active", note: "Active pilot projects", res: { count: 4, items: [{ id: "pl_1", title: "ULPIN parcel verification, Nashik", stage: "Recruiting partners" }] } },
   { path: "/v1/analytics/land-use-change?state=MH", note: "Land-use change, permitted summary only", res: { state: "MH", period: "2018-2025", built_up_change_pct: 9.1, note: "Parcel-level detail is restricted" } },
 ];
-const LEVEL = { Beginner: "bg-emerald-100 text-emerald-800", Intermediate: "bg-amber-100 text-amber-800", Advanced: "bg-rose-100 text-rose-800" };
-const ST = { "Under review": "bg-amber-100 text-amber-800", Shortlisted: "bg-blue-100 text-blue-800", Awarded: "bg-emerald-100 text-emerald-800", Submitted: "bg-slate-200 text-slate-700" };
+const LEVEL = { Beginner: "bg-emerald-100 text-emerald-800 border border-emerald-200", Intermediate: "bg-amber-100 text-amber-800 border border-amber-200", Advanced: "bg-rose-100 text-rose-800 border border-rose-200" };
+const ST = { "Under review": "bg-amber-100 text-amber-800", Shortlisted: "bg-blue-100 text-blue-800", Awarded: "bg-emerald-100 text-emerald-800", Submitted: "bg-stone-200 text-stone-700" };
 
 const DISTRICTS = {
   type: "FeatureCollection",
@@ -77,41 +80,47 @@ const DISTRICTS = {
     ["Kochi", 76.27, 9.93, 31, 84, 23], ["Thrissur", 76.21, 10.53, 24, 72, 21], ["Kozhikode", 75.78, 11.25, 26, 70, 18],
   ].map(([name, lng, lat, land, infra, clim]) => ({ type: "Feature", geometry: { type: "Point", coordinates: [lng, lat] }, properties: { name, land, infra, clim } })),
 };
-const LAYER_PROP = { "Land use": ["land", "#e11d48", 10, 40, "Built-up area (%)"], Infrastructure: ["infra", "#2563eb", 40, 100, "Road and rail density"], "Climate risk": ["clim", "#d97706", 5, 25, "Flood-prone area (%)"] };
+const LAYER_PROP = { "Land use": ["land", "#1f3d2b", 10, 40, "Built-up area (%)"], Infrastructure: ["infra", "#b8923a", 40, 100, "Road and rail density"], "Climate risk": ["clim", "#b91c1c", 5, 25, "Flood-prone area (%)"] };
 const VIEW = { Maharashtra: [[75.7, 19.4], 5.3], Gujarat: [[71.5, 22.7], 5.4], Kerala: [[76.3, 10.4], 6.4] };
 const dotPaint = (layer) => {
   const [prop, color, lo, hi] = LAYER_PROP[layer];
-  return { "circle-color": color, "circle-opacity": 0.75, "circle-stroke-color": "#ffffff", "circle-stroke-width": 1.5, "circle-radius": ["interpolate", ["linear"], ["get", prop], lo, 6, hi, 22] };
+  return { "circle-color": color, "circle-opacity": 0.8, "circle-stroke-color": "#ffffff", "circle-stroke-width": 1.5, "circle-radius": ["interpolate", ["linear"], ["get", prop], lo, 6, hi, 22] };
 };
 
 /* ---------------- helpers ---------------- */
 const cx = (...a) => a.filter(Boolean).join(" ");
 const rand = () => Math.random().toString(36).slice(2, 10);
-const inp = "w-full rounded-xl border border-slate-300 bg-white px-3 py-2.5 text-sm outline-none focus:border-rose-600 focus:ring-2 focus:ring-rose-100";
+const inp = "w-full rounded-xl border border-stone-300 bg-white px-3 py-2.5 text-sm outline-none focus:border-[#1f3d2b] focus:ring-2 focus:ring-[#1f3d2b]/15";
 
 function Btn({ kind = "ghost", className, ...p }) {
-  const k = { primary: "bg-rose-600 text-white hover:bg-rose-700", ghost: "border border-slate-300 text-slate-700 hover:bg-slate-50", done: "bg-emerald-50 text-emerald-800 ring-1 ring-emerald-200 hover:bg-emerald-100", dark: "bg-slate-800 text-white hover:bg-slate-900" }[kind];
-  return <button {...p} className={cx("inline-flex items-center justify-center gap-1.5 rounded-xl px-3.5 py-2 text-sm font-semibold disabled:cursor-not-allowed disabled:opacity-40", k, className)} />;
+  const k = {
+    primary: "bg-[#1f3d2b] text-white hover:bg-[#2a5239]",
+    ghost: "border border-stone-300 text-stone-700 bg-white hover:bg-stone-100",
+    done: "bg-emerald-50 text-emerald-800 border border-emerald-200 hover:bg-emerald-100",
+    dark: "bg-stone-800 text-white hover:bg-stone-900",
+    gold: "bg-[#b8923a] text-[#1f3d2b] font-bold hover:bg-[#c9a24a]",
+  }[kind];
+  return <button {...p} className={cx("inline-flex items-center justify-center gap-1.5 rounded-xl px-3.5 py-2 text-sm font-semibold transition disabled:cursor-not-allowed disabled:opacity-40", k, className)} />;
 }
 function Card({ title, right, children, className }) {
   return (
-    <section className={cx("rounded-2xl bg-white ring-1 ring-slate-200", className)}>
-      <header className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-100 px-5 py-3.5">
-        <h2 className="font-['Newsreader',serif] text-lg font-semibold text-slate-900">{title}</h2>{right}
+    <section className={cx("rounded-2xl border border-stone-300 bg-white shadow-sm", className)}>
+      <header className="flex flex-wrap items-center justify-between gap-3 border-b border-stone-200 px-5 py-3.5">
+        <h2 className="font-['Newsreader',serif] text-lg font-semibold text-[#1f3d2b]">{title}</h2>{right}
       </header>
       <div className="p-5">{children}</div>
     </section>
   );
 }
-const Chip = ({ children, className }) => <span className={cx("rounded-full bg-slate-100 px-2.5 py-0.5 text-xs font-medium text-slate-700", className)}>{children}</span>;
-const Empty = ({ children }) => <p className="py-8 text-center text-sm text-slate-500">{children}</p>;
+const Chip = ({ children, className }) => <span className={cx("rounded-full bg-stone-100 px-2.5 py-0.5 text-xs font-medium text-stone-700 border border-stone-200", className)}>{children}</span>;
+const Empty = ({ children }) => <p className="py-8 text-center text-sm text-stone-500">{children}</p>;
 function Modal({ title, onClose, children }) {
   return (
-    <div className="fixed inset-0 z-50 grid place-items-center bg-slate-900/50 p-4" onClick={onClose}>
-      <div role="dialog" aria-modal="true" aria-label={title} onClick={(e) => e.stopPropagation()} className="w-full max-w-md rounded-2xl bg-white p-6 shadow-xl">
+    <div className="fixed inset-0 z-50 grid place-items-center bg-[#26282b]/60 p-4 backdrop-blur-sm" onClick={onClose}>
+      <div role="dialog" aria-modal="true" aria-label={title} onClick={(e) => e.stopPropagation()} className="w-full max-w-md rounded-2xl border-t-4 border-[#b8923a] bg-[#faf7f1] p-6 shadow-2xl">
         <div className="flex items-center justify-between">
-          <h3 className="font-['Newsreader',serif] text-xl font-semibold text-slate-900">{title}</h3>
-          <button onClick={onClose} aria-label="Close" className="rounded-md p-1 text-slate-500 hover:bg-slate-100"><X size={18} /></button>
+          <h3 className="font-['Newsreader',serif] text-xl font-semibold text-[#1f3d2b]">{title}</h3>
+          <button onClick={onClose} aria-label="Close" className="rounded-md p-1 text-stone-500 hover:bg-stone-200"><X size={18} /></button>
         </div>
         <div className="mt-4">{children}</div>
       </div>
@@ -129,32 +138,43 @@ function MiniMap({ layer, stateSel }) {
 
   useEffect(() => {
     let dead = false;
-    (async () => {
-      try {
-        const gl = await import("maplibre-gl");
-        if (dead || !box.current) return;
-        const m = new gl.Map({
-          container: box.current, center: VIEW[stateSel][0], zoom: VIEW[stateSel][1],
-          style: { version: 8, sources: { base: { type: "raster", tiles: ["https://a.basemaps.cartocdn.com/light_all/{z}/{x}/{y}.png"], tileSize: 256, attribution: "© OpenStreetMap contributors © CARTO" } }, layers: [{ id: "base", type: "raster", source: "base" }] },
+    try {
+      if (!box.current) return;
+      const m = new maplibregl.Map({
+        container: box.current,
+        center: VIEW[stateSel][0],
+        zoom: VIEW[stateSel][1],
+        style: {
+          version: 8,
+          sources: {
+            base: {
+              type: "raster",
+              tiles: ["https://a.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}@2x.png"],
+              tileSize: 256,
+              attribution: "© OpenStreetMap contributors © CARTO",
+            },
+          },
+          layers: [{ id: "base", type: "raster", source: "base" }],
+        },
+      });
+      map.current = m;
+      m.addControl(new maplibregl.NavigationControl({ showCompass: false }), "top-right");
+      m.on("load", () => {
+        if (dead) return;
+        m.addSource("districts", { type: "geojson", data: DISTRICTS });
+        m.addLayer({ id: "dots", type: "circle", source: "districts", paint: dotPaint(cur.current) });
+        m.on("click", "dots", (e) => {
+          const [prop, , , , label] = LAYER_PROP[cur.current];
+          const p = e.features[0].properties;
+          new maplibregl.Popup({ closeButton: false }).setLngLat(e.lngLat).setHTML(`<div style="padding:4px; font-family:sans-serif;"><b style="color:#1f3d2b;">${p.name}</b><br/><span style="font-size:12px; color:#5c5a4b;">${label}: <b>${p[prop]}</b></span></div>`).addTo(m);
         });
-        map.current = m;
-        m.addControl(new gl.NavigationControl({ showCompass: false }), "top-right");
-        m.on("load", () => {
-          m.addSource("districts", { type: "geojson", data: DISTRICTS });
-          m.addLayer({ id: "dots", type: "circle", source: "districts", paint: dotPaint(cur.current) });
-          m.on("click", "dots", (e) => {
-            const [prop, , , , label] = LAYER_PROP[cur.current];
-            const p = e.features[0].properties;
-            new gl.Popup({ closeButton: false }).setLngLat(e.lngLat).setHTML(`<b>${p.name}</b><br/>${label}: ${p[prop]}`).addTo(m);
-          });
-          m.on("mouseenter", "dots", () => { m.getCanvas().style.cursor = "pointer"; });
-          m.on("mouseleave", "dots", () => { m.getCanvas().style.cursor = ""; });
-          setReady(true);
-        });
-      } catch {
-        setErr("The map could not load. Check your internet connection and refresh.");
-      }
-    })();
+        m.on("mouseenter", "dots", () => { m.getCanvas().style.cursor = "pointer"; });
+        m.on("mouseleave", "dots", () => { m.getCanvas().style.cursor = ""; });
+        setReady(true);
+      });
+    } catch {
+      setErr("The map could not load. Check your internet connection and refresh.");
+    }
     return () => { dead = true; map.current?.remove(); map.current = null; };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
@@ -172,11 +192,14 @@ function MiniMap({ layer, stateSel }) {
 
   return (
     <div className="mt-4">
-      <div className="relative h-64 overflow-hidden rounded-xl ring-1 ring-slate-200">
+      <div className="relative h-64 overflow-hidden rounded-xl border border-stone-300">
         <div ref={box} className="h-full w-full" />
-        {err && <p className="absolute inset-0 grid place-items-center bg-slate-50 p-6 text-center text-sm text-slate-500">{err}</p>}
+        {err && <p className="absolute inset-0 grid place-items-center bg-stone-100 p-6 text-center text-sm text-stone-500">{err}</p>}
       </div>
-      <p className="mt-2 flex items-center gap-2 text-xs text-slate-500"><span className="h-2.5 w-2.5 shrink-0 rounded-full" style={{ background: LAYER_PROP[layer][1] }} />{LAYER_PROP[layer][4]}. Bigger dots mean higher values. Click a dot for details.</p>
+      <p className="mt-2 flex items-center gap-2 text-xs text-stone-600">
+        <span className="h-2.5 w-2.5 shrink-0 rounded-full" style={{ background: LAYER_PROP[layer][1] }} />
+        {LAYER_PROP[layer][4]}. Bigger circles indicate higher values. Click any district dot for specific metrics.
+      </p>
     </div>
   );
 }
@@ -209,6 +232,7 @@ export default function Industry({ user: userProp, onLogout: logoutProp }) {
   const [busy, setBusy] = useState(false);
   const [calls, setCalls] = useState(0);
   const [modal, setModal] = useState(null);
+  const [mapModal, setMapModal] = useState(null);
   const [form, setForm] = useState({ title: "", ref: "", text: "", sector: "Land records" });
   const [toast, setToast] = useState("");
 
@@ -256,68 +280,101 @@ export default function Industry({ user: userProp, onLogout: logoutProp }) {
   const joinedCount = challenges.filter((c) => c.joined).length;
 
   return (
-    <div className="min-h-screen bg-slate-50 font-['Public_Sans',sans-serif] text-slate-800">
+    <div className="min-h-screen bg-[#f4efe6] font-['Public_Sans',sans-serif] text-[#26282b]">
       <style>{`@import url('https://fonts.googleapis.com/css2?family=Newsreader:opsz,wght@6..72,500;6..72,600&family=Public+Sans:wght@400;500;600&display=swap');`}</style>
 
-      <header className="sticky top-0 z-20 flex items-center justify-between gap-3 bg-[#0a1a44] px-5 py-3 text-white sm:px-8">
+      {/* Header */}
+      <header className="sticky top-0 z-20 flex items-center justify-between gap-3 border-b border-[#1f3d2b]/15 bg-[#f4efe6]/95 px-5 py-3 backdrop-blur sm:px-8">
         <div className="flex items-center gap-2.5">
-          <span className="grid h-9 w-9 place-items-center rounded-lg bg-blue-600"><Landmark size={18} /></span>
-          <div><p className="font-['Newsreader',serif] text-xl font-semibold leading-none">Bhoomi</p><p className="mt-1 text-xs text-blue-200">Opportunity board</p></div>
+          <span className="grid h-9 w-9 place-items-center rounded-lg bg-[#1f3d2b] text-[#d2b067]"><Landmark size={18} /></span>
+          <div><p className="font-['Newsreader',serif] text-xl font-semibold leading-none text-[#1f3d2b]">Bhoomi</p><p className="mt-1 text-xs text-[#5c5a4b]">Industry & Innovation</p></div>
         </div>
         <div className="flex items-center gap-3">
-          <div className="hidden text-right sm:block"><p className="text-sm font-medium">{user.name}</p><p className="text-xs text-blue-200">{ROLES.industry.label}</p></div>
-          <button onClick={onLogout} className="flex items-center gap-2 rounded-lg bg-white/10 px-3.5 py-2 text-sm font-semibold hover:bg-white/20"><LogOut size={15} />Sign out</button>
+          <button type="button" onClick={() => window.dispatchEvent(new CustomEvent("open-bhoomi-ai"))} className="flex items-center gap-2 rounded-lg bg-[#1f3d2b] px-3.5 py-2 text-sm font-semibold text-white hover:bg-[#2a5239] transition"><Sparkles size={15} />Bhoomi AI</button>
+          <div className="hidden text-right sm:block"><p className="text-sm font-medium text-stone-900">{user.name}</p><p className="text-xs text-stone-500">{ROLES.industry.label}</p></div>
+          <button onClick={onLogout} className="flex items-center gap-2 rounded-lg border border-stone-300 bg-white px-3.5 py-2 text-sm font-semibold text-stone-700 hover:bg-stone-50 transition"><LogOut size={15} />Sign out</button>
         </div>
       </header>
 
       <main className="mx-auto max-w-7xl space-y-5 p-5 sm:p-8">
-        <section className="rounded-2xl bg-[#0a1a44] p-8 text-white sm:p-10">
-          <h1 className="max-w-2xl font-['Newsreader',serif] text-4xl font-medium leading-tight sm:text-5xl">Find a challenge that fits your team, {String(user.name || "there").split(" ")[0]}.</h1>
-          <p className="mt-3 max-w-xl text-lg text-blue-100">Build for land governance: join hackathons, partner on pilots and share what works.</p>
+        {/* Hero banner */}
+        <section className="relative overflow-hidden rounded-2xl border border-stone-300 bg-[#1f3d2b] p-8 text-white shadow-sm sm:p-10">
+          <div className="pointer-events-none absolute -mr-16 -mt-16 right-0 top-0 h-64 w-64 rounded-full bg-[#b8923a]/10" />
+          <span className="inline-block rounded-full border border-[#b8923a]/40 bg-[#b8923a]/20 px-3 py-1 text-xs font-semibold text-[#ffd166]">Industry & Innovation Hub</span>
+          <h1 className="mt-3 max-w-2xl font-['Newsreader',serif] text-4xl font-medium leading-tight sm:text-5xl">Find a challenge that fits your team, {String(user.name || "there").split(" ")[0]}.</h1>
+          <p className="mt-3 max-w-xl text-lg font-light text-emerald-100/90">Build for land governance: join hackathons, partner on pilots and share what works.</p>
           <div className="mt-6 flex flex-wrap gap-3">
-            <button onClick={() => setTab("opps")} className="rounded-xl bg-rose-600 px-5 py-3 font-semibold hover:bg-rose-500">Browse challenges</button>
-            <button onClick={() => openForm("submit")} className="rounded-xl bg-white/10 px-5 py-3 font-semibold hover:bg-white/20">Submit an innovation</button>
-            <button onClick={() => openForm("case")} className="rounded-xl bg-white/10 px-5 py-3 font-semibold hover:bg-white/20">Share a case study</button>
+            <button onClick={() => setTab("opps")} className="rounded-xl bg-[#b8923a] px-5 py-3 font-semibold text-[#1f3d2b] transition hover:bg-[#c9a24a]">Browse challenges</button>
+            <button onClick={() => openForm("submit")} className="rounded-xl border border-white/20 bg-white/10 px-5 py-3 font-semibold text-white transition hover:bg-white/20">Submit an innovation</button>
+            <button onClick={() => openForm("case")} className="rounded-xl border border-white/20 bg-white/10 px-5 py-3 font-semibold text-white transition hover:bg-white/20">Share a case study</button>
           </div>
           <ul className="mt-8 grid gap-3 sm:grid-cols-3">
             {[[Trophy, `${joinedCount} challenge${joinedCount === 1 ? "" : "s"} joined`], [Rocket, `${pilots.filter((p) => p.applied).length} pilot applications`], [Users, `${spaces.filter((s) => s.joined).length} workspaces`]].map(([I, t]) => (
-              <li key={t} className="flex items-center gap-3 text-blue-50"><span className="grid h-9 w-9 shrink-0 place-items-center rounded-lg bg-white/10"><I size={18} /></span>{t}</li>
+              <li key={t} className="flex items-center gap-3 text-stone-200"><span className="grid h-9 w-9 shrink-0 place-items-center rounded-lg bg-white/10"><I size={18} /></span>{t}</li>
             ))}
           </ul>
         </section>
 
-        <div className="overflow-x-auto"><div className="inline-grid auto-cols-max grid-flow-col rounded-xl bg-slate-200 p-1" role="tablist">
-          {TABS.map(([id, l]) => <button key={id} role="tab" aria-selected={tab === id} onClick={() => setTab(id)} className={cx("rounded-lg px-4 py-2.5 text-sm font-semibold", tab === id ? "bg-white text-rose-700 shadow" : "text-slate-600")}>{l}</button>)}
-        </div></div>
+        {/* Tab switcher */}
+        <div className="overflow-x-auto">
+          <div className="inline-grid auto-cols-max grid-flow-col rounded-xl border border-stone-300 bg-[#ebe5d8] p-1" role="tablist">
+            {TABS.map(([id, l]) => (
+              <button
+                key={id}
+                role="tab"
+                aria-selected={tab === id}
+                onClick={() => setTab(id)}
+                className={cx("rounded-lg px-4 py-2.5 text-sm font-semibold transition", tab === id ? "bg-white text-[#1f3d2b] shadow-sm font-bold" : "text-stone-700 hover:text-[#1f3d2b]")}
+              >
+                {l}
+              </button>
+            ))}
+          </div>
+        </div>
 
         {/* ===== opportunities ===== */}
         {tab === "opps" && (
           <>
-            <Card title="Match me" right={<span className="flex items-center gap-1.5 text-sm text-slate-500"><Sparkles size={15} />Pick what your team does</span>}>
-              <div className="flex flex-wrap gap-2">{SKILLS.map((s) => <button key={s} aria-pressed={skills.includes(s)} onClick={() => toggleSkill(s)} className={cx("rounded-full px-3.5 py-1.5 text-sm font-medium", skills.includes(s) ? "bg-rose-600 text-white" : "bg-slate-100 text-slate-700 hover:bg-slate-200")}>{s}</button>)}</div>
-              {matches.length === 0 ? <p className="mt-4 text-sm text-slate-500">Pick at least one skill to see matching challenges.</p> : (
+            <Card title="Match me" right={<span className="flex items-center gap-1.5 text-sm text-stone-500"><Sparkles size={15} />Pick what your team does</span>}>
+              <div className="flex flex-wrap gap-2">
+                {SKILLS.map((s) => (
+                  <button
+                    key={s}
+                    aria-pressed={skills.includes(s)}
+                    onClick={() => toggleSkill(s)}
+                    className={cx("rounded-full px-3.5 py-1.5 text-sm font-medium transition", skills.includes(s) ? "bg-[#1f3d2b] text-white shadow-sm" : "bg-stone-100 text-stone-700 border border-stone-200 hover:bg-stone-200")}
+                  >
+                    {s}
+                  </button>
+                ))}
+              </div>
+              {matches.length === 0 ? <p className="mt-4 text-sm text-stone-500">Pick at least one skill to see matching challenges.</p> : (
                 <ul className="mt-4 grid gap-3 md:grid-cols-3">{matches.map((c) => (
-                  <li key={c.id} className="rounded-xl bg-slate-50 p-4">
-                    <p className="text-2xl font-semibold text-rose-600">{c.pct}%</p><p className="text-xs text-slate-500">skill match</p>
-                    <p className="mt-2 text-sm font-medium text-slate-900">{c.title}</p>
+                  <li key={c.id} className="rounded-xl border border-stone-200 bg-stone-50 p-4">
+                    <p className="text-2xl font-semibold text-[#b8923a]">{c.pct}%</p><p className="text-xs text-stone-500">skill match</p>
+                    <p className="mt-2 text-sm font-medium text-stone-900">{c.title}</p>
                     <Btn kind={c.joined ? "done" : "ghost"} className="mt-3" onClick={() => join(c)}>{c.joined ? <><Check size={14} />Joined</> : "Join"}</Btn>
                   </li>))}</ul>
               )}
             </Card>
 
             <div className="flex flex-wrap gap-3">
-              <div className="relative min-w-[220px] flex-1"><Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" /><input aria-label="Search challenges" value={q} onChange={(e) => setQ(e.target.value)} placeholder="Search by topic, organisation or skill" className={cx(inp, "pl-9")} /></div>
+              <div className="relative min-w-[220px] flex-1">
+                <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-stone-400" />
+                <input aria-label="Search challenges" value={q} onChange={(e) => setQ(e.target.value)} placeholder="Search by topic, organisation or skill" className={cx(inp, "pl-9")} />
+              </div>
               <select aria-label="Filter by type" value={typeF} onChange={(e) => setTypeF(e.target.value)} className={cx(inp, "w-auto")}><option value="all">All types</option><option>Hackathon</option><option>Challenge</option><option>Grant call</option></select>
               <select aria-label="Filter by difficulty" value={levelF} onChange={(e) => setLevelF(e.target.value)} className={cx(inp, "w-auto")}><option value="all">Any difficulty</option><option>Beginner</option><option>Intermediate</option><option>Advanced</option></select>
             </div>
+
             {shown.length === 0 ? <Empty>No challenges match. Clear the search or change a filter.</Empty> : (
               <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">{shown.map((c) => (
-                <article key={c.id} className="flex flex-col rounded-2xl bg-white p-5 ring-1 ring-slate-200">
-                  <div className="flex items-center gap-2"><Chip className="bg-blue-100 text-blue-800">{c.type}</Chip><Chip className={LEVEL[c.level]}>{c.level}</Chip></div>
-                  <h3 className="mt-3 font-['Newsreader',serif] text-lg font-semibold leading-snug text-slate-900">{c.title}</h3>
-                  <p className="mt-1 text-sm text-slate-500">{c.org}</p>
+                <article key={c.id} className="flex flex-col rounded-2xl border border-stone-300 bg-white p-5 shadow-sm">
+                  <div className="flex items-center gap-2"><Chip className="bg-stone-100 text-stone-800">{c.type}</Chip><Chip className={LEVEL[c.level]}>{c.level}</Chip></div>
+                  <h3 className="mt-3 font-['Newsreader',serif] text-lg font-semibold leading-snug text-[#1f3d2b]">{c.title}</h3>
+                  <p className="mt-1 text-sm text-stone-500">{c.org}</p>
                   <div className="mt-3 flex flex-wrap gap-1.5">{c.tags.map((t) => <Chip key={t}>{t}</Chip>)}</div>
-                  <div className="mt-4 flex items-center gap-4 text-sm text-slate-600"><span className="flex items-center gap-1.5"><Trophy size={15} />{c.prize}</span><span className="flex items-center gap-1.5"><Calendar size={15} />{c.days} days left</span></div>
+                  <div className="mt-4 flex items-center gap-4 text-sm text-stone-600"><span className="flex items-center gap-1.5 font-medium text-[#b8923a]"><Trophy size={15} />{c.prize}</span><span className="flex items-center gap-1.5"><Calendar size={15} />{c.days} days left</span></div>
                   <div className="mt-auto flex gap-2 pt-4">
                     <Btn kind={c.joined ? "done" : "primary"} className="flex-1" onClick={() => join(c)}>{c.joined ? <><Check size={14} />Joined</> : "Join"}</Btn>
                     {c.joined && <Btn onClick={() => { setForm({ title: "", ref: c.title, text: "", sector: "" }); setModal("submit"); }}>Submit</Btn>}
@@ -330,13 +387,31 @@ export default function Industry({ user: userProp, onLogout: logoutProp }) {
         {/* ===== pilots ===== */}
         {tab === "pilots" && (
           <div className="grid gap-4 md:grid-cols-2">{pilots.map((p) => (
-            <article key={p.id} className="flex flex-col rounded-2xl bg-white p-5 ring-1 ring-slate-200">
-              <Chip className="w-fit bg-amber-100 text-amber-800">{p.stage}</Chip>
-              <h3 className="mt-3 font-['Newsreader',serif] text-lg font-semibold text-slate-900">{p.title}</h3>
-              <p className="mt-1 text-sm text-slate-500">Led by {p.lead} · {p.months} months</p>
-              <p className="mt-3 text-xs font-semibold text-slate-500">Partners needed with</p>
-              <div className="mt-1.5 flex flex-wrap gap-1.5">{p.needs.map((t) => <Chip key={t} className={skills.includes(t) ? "bg-rose-100 text-rose-800" : ""}>{t}</Chip>)}</div>
-              <Btn kind={p.applied ? "done" : "primary"} className="mt-auto self-start" onClick={() => apply(p)}>{p.applied ? <><Check size={14} />Applied, withdraw</> : "Apply as partner"}</Btn>
+            <article key={p.id} className="flex flex-col rounded-2xl border border-stone-300 bg-white p-5 shadow-sm">
+              <div className="flex items-center justify-between gap-2">
+                <Chip className="w-fit bg-amber-100 text-amber-800 border-amber-200">{p.stage}</Chip>
+                <button
+                  type="button"
+                  onClick={() => setMapModal({
+                    title: `Pilot Site: ${p.title}`,
+                    subtitle: `${p.loc} · Led by ${p.lead}`,
+                    center: p.coords,
+                    zoom: 12,
+                    markers: [{ lng: p.coords[0], lat: p.coords[1], title: p.title, description: `Stage: ${p.stage}` }]
+                  })}
+                  className="flex items-center gap-1.5 rounded-lg border border-stone-300 bg-[#faf7f1] px-2.5 py-1 text-xs font-semibold text-[#1f3d2b] hover:bg-stone-200 transition"
+                >
+                  <MapPin size={13} className="text-[#b8923a]" /> View site map
+                </button>
+              </div>
+              <h3 className="mt-3 font-['Newsreader',serif] text-lg font-semibold text-[#1f3d2b]">{p.title}</h3>
+              <p className="mt-1 text-sm text-stone-500">Led by {p.lead} · {p.months} months</p>
+              <p className="mt-3 text-xs font-semibold text-stone-500">Partners needed with</p>
+              <div className="mt-1.5 flex flex-wrap gap-1.5">{p.needs.map((t) => <Chip key={t} className={skills.includes(t) ? "bg-[#1f3d2b] text-white border-transparent" : ""}>{t}</Chip>)}</div>
+              <div className="mt-auto flex items-center justify-between pt-4">
+                <Btn kind={p.applied ? "done" : "primary"} onClick={() => apply(p)}>{p.applied ? <><Check size={14} />Applied, withdraw</> : "Apply as partner"}</Btn>
+                <span className="text-xs text-stone-500 flex items-center gap-1"><Globe size={13} /> {p.loc}</span>
+              </div>
             </article>))}</div>
         )}
 
@@ -345,17 +420,17 @@ export default function Industry({ user: userProp, onLogout: logoutProp }) {
           <div className="grid gap-5 lg:grid-cols-2">
             <Card title="My submissions" right={<Btn kind="primary" onClick={() => openForm("submit")}><Plus size={15} />New submission</Btn>}>
               {subs.length === 0 ? <Empty>No submissions yet. Submit an innovation to a challenge.</Empty> : (
-                <ul className="divide-y divide-slate-100">{subs.map((s) => (
+                <ul className="divide-y divide-stone-100">{subs.map((s) => (
                   <li key={s.id} className="flex items-start justify-between gap-3 py-3 first:pt-0 last:pb-0">
-                    <div className="min-w-0"><p className="font-medium text-slate-900">{s.title}</p><p className="text-xs text-slate-500">For: {s.to} · {s.on}</p></div>
-                    <div className="flex items-center gap-2"><Chip className={ST[s.st]}>{s.st}</Chip><button aria-label={`Withdraw ${s.title}`} onClick={() => { setSubs((l) => l.filter((x) => x.id !== s.id)); say("Submission withdrawn"); }} className="rounded-md p-1 text-slate-400 hover:bg-slate-100 hover:text-slate-700"><X size={16} /></button></div>
+                    <div className="min-w-0"><p className="font-medium text-stone-900">{s.title}</p><p className="text-xs text-stone-500">For: {s.to} · {s.on}</p></div>
+                    <div className="flex items-center gap-2"><Chip className={ST[s.st]}>{s.st}</Chip><button aria-label={`Withdraw ${s.title}`} onClick={() => { setSubs((l) => l.filter((x) => x.id !== s.id)); say("Submission withdrawn"); }} className="rounded-md p-1 text-stone-400 hover:bg-stone-100 hover:text-stone-700"><X size={16} /></button></div>
                   </li>))}</ul>
               )}
             </Card>
             <Card title="Workspaces">
-              <ul className="divide-y divide-slate-100">{spaces.map((s) => (
+              <ul className="divide-y divide-stone-100">{spaces.map((s) => (
                 <li key={s.id} className="flex items-center justify-between gap-3 py-3 first:pt-0 last:pb-0">
-                  <div><p className="font-medium text-slate-900">{s.name}</p><p className="text-xs text-slate-500">{s.lead} · {s.members} members</p></div>
+                  <div><p className="font-medium text-stone-900">{s.name}</p><p className="text-xs text-stone-500">{s.lead} · {s.members} members</p></div>
                   <Btn kind={s.joined ? "done" : "ghost"} onClick={() => toggleSpace(s)}>{s.joined ? <><Check size={14} />Joined</> : "Join as collaborator"}</Btn>
                 </li>))}</ul>
             </Card>
@@ -367,10 +442,10 @@ export default function Industry({ user: userProp, onLogout: logoutProp }) {
           <>
             <div className="flex justify-end"><Btn kind="primary" onClick={() => openForm("case")}><Plus size={15} />Share a case study</Btn></div>
             <div className="grid gap-4 md:grid-cols-2">{cases.map((c) => (
-              <article key={c.id} className="flex flex-col rounded-2xl bg-white p-5 ring-1 ring-slate-200">
-                <div className="flex items-center gap-2"><Chip className="bg-blue-100 text-blue-800">{c.sector}</Chip>{c.mine && <Chip className="bg-rose-100 text-rose-800">Shared by you</Chip>}</div>
-                <h3 className="mt-3 font-['Newsreader',serif] text-lg font-semibold leading-snug text-slate-900">{c.title}</h3>
-                <p className="mt-1 text-sm text-slate-500">{c.by} · {c.region}</p>
+              <article key={c.id} className="flex flex-col rounded-2xl border border-stone-300 bg-white p-5 shadow-sm">
+                <div className="flex items-center gap-2"><Chip className="bg-stone-100 text-stone-800">{c.sector}</Chip>{c.mine && <Chip className="bg-emerald-100 text-emerald-800 border-emerald-200">Shared by you</Chip>}</div>
+                <h3 className="mt-3 font-['Newsreader',serif] text-lg font-semibold leading-snug text-[#1f3d2b]">{c.title}</h3>
+                <p className="mt-1 text-sm text-stone-500">{c.by} · {c.region}</p>
                 <Btn className="mt-4 self-start" onClick={() => { upd(setCases, c.id, { saved: !c.saved }); say(c.saved ? "Removed from saved" : "Saved to your library"); }}><Bookmark size={14} className={c.saved ? "fill-current" : ""} />{c.saved ? "Saved" : "Save"}</Btn>
               </article>))}</div>
           </>
@@ -381,32 +456,65 @@ export default function Industry({ user: userProp, onLogout: logoutProp }) {
           <div className="grid gap-5 lg:grid-cols-2">
             <Card title="Permitted repository">
               <div className="mb-4 flex flex-wrap gap-3">
-                <div className="relative min-w-[180px] flex-1"><Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" /><input aria-label="Search repository" value={rq} onChange={(e) => setRq(e.target.value)} placeholder="Search papers, policies, datasets" className={cx(inp, "pl-9")} /></div>
+                <div className="relative min-w-[180px] flex-1"><Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-stone-400" /><input aria-label="Search repository" value={rq} onChange={(e) => setRq(e.target.value)} placeholder="Search papers, policies, datasets" className={cx(inp, "pl-9")} /></div>
                 <select aria-label="Filter by type" value={rType} onChange={(e) => setRType(e.target.value)} className={cx(inp, "w-auto")}><option value="all">All</option><option>Paper</option><option>Policy</option><option>Dataset</option></select>
               </div>
               {rShown.length === 0 ? <Empty>Nothing matches your search.</Empty> : (
-                <ul className="divide-y divide-slate-100">{rShown.map((r) => (
+                <ul className="divide-y divide-stone-100">{rShown.map((r) => (
                   <li key={r.id} className="flex items-center justify-between gap-3 py-2.5 first:pt-0 last:pb-0">
-                    <div className="flex min-w-0 items-center gap-3"><FileText size={17} className="shrink-0 text-slate-400" /><div className="min-w-0"><p className="truncate text-sm font-medium text-slate-900">{r.title}</p><p className="text-xs text-slate-500">{r.type}</p></div></div>
+                    <div className="flex min-w-0 items-center gap-3"><FileText size={17} className="shrink-0 text-stone-400" /><div className="min-w-0"><p className="truncate text-sm font-medium text-stone-900">{r.title}</p><p className="text-xs text-stone-500">{r.type}</p></div></div>
                     <Btn onClick={() => { upd(setRepo, r.id, { saved: !r.saved }); say(r.saved ? "Removed from library" : "Saved to your library"); }}><Bookmark size={14} className={r.saved ? "fill-current" : ""} />{r.saved ? "Saved" : "Save"}</Btn>
                   </li>))}</ul>
               )}
             </Card>
 
             <Card title="Limited GIS and analytics" right={<select aria-label="State" value={stateSel} onChange={(e) => setStateSel(e.target.value)} className={cx(inp, "w-auto py-1.5")}><option>Maharashtra</option><option>Gujarat</option><option>Kerala</option></select>}>
-              <div className="flex flex-wrap gap-2">{Object.keys(SERIES).map((l) => <button key={l} aria-pressed={layer === l} onClick={() => setLayer(l)} className={cx("flex items-center gap-1.5 rounded-full px-3 py-1.5 text-sm font-medium", layer === l ? "bg-rose-600 text-white" : "bg-slate-100 text-slate-700 hover:bg-slate-200")}><Layers size={13} />{l}</button>)}</div>
+              <div className="flex flex-wrap gap-2">{Object.keys(SERIES).map((l) => (
+                <button
+                  key={l}
+                  aria-pressed={layer === l}
+                  onClick={() => setLayer(l)}
+                  className={cx("flex items-center gap-1.5 rounded-full px-3 py-1.5 text-sm font-medium transition", layer === l ? "bg-[#1f3d2b] text-white shadow-sm" : "bg-stone-100 text-stone-700 border border-stone-200 hover:bg-stone-200")}
+                >
+                  <Layers size={13} />{l}
+                </button>
+              ))}</div>
               <MiniMap layer={layer} stateSel={stateSel} />
-              <p className="mt-4 text-sm font-medium text-slate-800">Trend: {SERIES[layer].unit}, {stateSel}</p>
-              <div className="mt-2 h-52"><ResponsiveContainer><LineChart data={chart}><CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" /><XAxis dataKey="y" tick={{ fontSize: 12 }} /><YAxis tick={{ fontSize: 12 }} width={40} domain={["auto", "auto"]} /><Tooltip /><Line type="monotone" dataKey="v" stroke="#e11d48" strokeWidth={2.5} dot={{ r: 3 }} name={layer} /></LineChart></ResponsiveContainer></div>
-              <p className="mt-4 text-xs font-semibold text-slate-500">Layers that need admin approval</p>
+              <p className="mt-4 text-sm font-medium text-stone-800">Trend: {SERIES[layer].unit}, {stateSel}</p>
+              <div className="mt-2 h-52">
+                <ResponsiveContainer>
+                  <LineChart data={chart}>
+                    <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
+                    <XAxis dataKey="y" tick={{ fontSize: 12 }} />
+                    <YAxis tick={{ fontSize: 12 }} width={40} domain={["auto", "auto"]} />
+                    <Tooltip />
+                    <Line type="monotone" dataKey="v" stroke="#1f3d2b" strokeWidth={2.5} dot={{ r: 4, fill: "#b8923a" }} name={layer} />
+                  </LineChart>
+                </ResponsiveContainer>
+              </div>
+              <p className="mt-4 text-xs font-semibold text-stone-500">Layers that need admin approval</p>
               <ul className="mt-2 space-y-2">{LOCKED.map((l) => (
-                <li key={l} className="flex items-center justify-between gap-3 text-sm"><span className="flex items-center gap-2 text-slate-700"><Lock size={14} className="text-slate-400" />{l}</span>
-                  <Btn disabled={requested.includes(l)} onClick={() => request(l)}>{requested.includes(l) ? "Requested" : "Request access"}</Btn></li>))}</ul>
+                <li key={l} className="flex items-center justify-between gap-3 text-sm">
+                  <span className="flex items-center gap-2 text-stone-700"><Lock size={14} className="text-stone-400" />{l}</span>
+                  <Btn disabled={requested.includes(l)} onClick={() => request(l)}>{requested.includes(l) ? "Requested" : "Request access"}</Btn>
+                </li>))}</ul>
             </Card>
 
             <Card title="Pilot impact assessments" className="lg:col-span-2">
-              <p className="text-sm text-slate-600">Time to complete a case after the pilot, indexed so the baseline is 100. Lower is better.</p>
-              <div className="mt-3 h-56"><ResponsiveContainer><BarChart data={IMPACT}><CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" /><XAxis dataKey="name" tick={{ fontSize: 12 }} /><YAxis tick={{ fontSize: 12 }} width={36} /><Tooltip /><Legend /><Bar dataKey="baseline" name="Baseline" fill="#cbd5e1" radius={[6, 6, 0, 0]} /><Bar dataKey="after" name="After pilot" fill="#e11d48" radius={[6, 6, 0, 0]} /></BarChart></ResponsiveContainer></div>
+              <p className="text-sm text-stone-600">Time to complete a case after the pilot, indexed so the baseline is 100. Lower is better.</p>
+              <div className="mt-3 h-56">
+                <ResponsiveContainer>
+                  <BarChart data={IMPACT}>
+                    <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
+                    <XAxis dataKey="name" tick={{ fontSize: 12 }} />
+                    <YAxis tick={{ fontSize: 12 }} width={36} />
+                    <Tooltip />
+                    <Legend />
+                    <Bar dataKey="baseline" name="Baseline" fill="#cbd5e1" radius={[6, 6, 0, 0]} />
+                    <Bar dataKey="after" name="After pilot" fill="#1f3d2b" radius={[6, 6, 0, 0]} />
+                  </BarChart>
+                </ResponsiveContainer>
+              </div>
             </Card>
           </div>
         )}
@@ -414,23 +522,23 @@ export default function Industry({ user: userProp, onLogout: logoutProp }) {
         {/* ===== API playground ===== */}
         {tab === "api" && (
           <div className="grid gap-5 lg:grid-cols-2">
-            <Card title="Request" right={<span className="text-sm text-slate-500">{calls} of 1,000 calls used this month</span>}>
-              <div className="rounded-xl bg-slate-50 p-4">
-                <p className="flex items-center gap-2 text-sm font-semibold text-slate-800"><KeyRound size={15} />Your API key</p>
+            <Card title="Request" right={<span className="text-sm text-stone-500">{calls} of 1,000 calls used this month</span>}>
+              <div className="rounded-xl border border-stone-200 bg-stone-50 p-4">
+                <p className="flex items-center gap-2 text-sm font-semibold text-stone-800"><KeyRound size={15} />Your API key</p>
                 {apiKey ? (
-                  <div className="mt-2 flex items-center gap-2"><code className="min-w-0 flex-1 break-all rounded-lg bg-white px-3 py-2 text-xs ring-1 ring-slate-200">{apiKey}</code><Btn onClick={() => copy(apiKey)}><Copy size={14} />Copy</Btn></div>
+                  <div className="mt-2 flex items-center gap-2"><code className="min-w-0 flex-1 break-all rounded-lg bg-white px-3 py-2 text-xs border border-stone-300 font-mono">{apiKey}</code><Btn onClick={() => copy(apiKey)}><Copy size={14} />Copy</Btn></div>
                 ) : <Btn kind="primary" className="mt-2" onClick={genKey}>Create API key</Btn>}
               </div>
               <label className="mt-4 block text-sm font-medium">Endpoint
                 <select value={ep} onChange={(e) => { setEp(Number(e.target.value)); setApiRes(null); }} className={cx(inp, "mt-1.5")}>{ENDPOINTS.map((e, i) => <option key={e.path} value={i}>GET {e.path}</option>)}</select>
               </label>
-              <p className="mt-1.5 text-xs text-slate-500">{ENDPOINTS[ep].note}</p>
-              <pre className="mt-4 overflow-x-auto rounded-xl bg-[#0a1a44] p-4 text-xs leading-relaxed text-blue-100">{curl}</pre>
+              <p className="mt-1.5 text-xs text-stone-500">{ENDPOINTS[ep].note}</p>
+              <pre className="mt-4 overflow-x-auto rounded-xl bg-[#1f3d2b] p-4 text-xs leading-relaxed text-[#f4efe6] font-mono">{curl}</pre>
               <div className="mt-4 flex gap-2"><Btn kind="primary" disabled={busy} onClick={send}>{busy ? <><Loader2 size={15} className="animate-spin" />Sending</> : <><Play size={15} />Send request</>}</Btn><Btn onClick={() => copy(curl)}><Copy size={14} />Copy curl</Btn></div>
             </Card>
-            <Card title="Response" right={apiRes && <Chip className={apiRes.status === 200 ? "bg-emerald-100 text-emerald-800" : "bg-rose-100 text-rose-800"}>{apiRes.status}{apiRes.ms ? ` · ${apiRes.ms} ms` : ""}</Chip>}>
-              {apiRes ? <pre className="max-h-96 overflow-auto rounded-xl bg-slate-50 p-4 text-xs leading-relaxed text-slate-800">{JSON.stringify(apiRes.body, null, 2)}</pre> : <Empty>Send a request to see the response here.</Empty>}
-              <p className="mt-3 flex items-center gap-2 text-xs text-slate-500"><Briefcase size={13} />Industry keys return permitted summaries only. Parcel-level data needs admin approval.</p>
+            <Card title="Response" right={apiRes && <Chip className={apiRes.status === 200 ? "bg-emerald-100 text-emerald-800 border-emerald-200" : "bg-rose-100 text-rose-800 border-rose-200"}>{apiRes.status}{apiRes.ms ? ` · ${apiRes.ms} ms` : ""}</Chip>}>
+              {apiRes ? <pre className="max-h-96 overflow-auto rounded-xl border border-stone-200 bg-stone-50 p-4 text-xs leading-relaxed text-stone-800 font-mono">{JSON.stringify(apiRes.body, null, 2)}</pre> : <Empty>Send a request to see the response here.</Empty>}
+              <p className="mt-3 flex items-center gap-2 text-xs text-stone-500"><Briefcase size={13} />Industry keys return permitted summaries only. Parcel-level data needs admin approval.</p>
             </Card>
           </div>
         )}
@@ -451,7 +559,21 @@ export default function Industry({ user: userProp, onLogout: logoutProp }) {
           <div className="mt-5 flex justify-end gap-2"><Btn onClick={() => setModal(null)}>Cancel</Btn><Btn kind="primary" onClick={modal === "submit" ? submitInnovation : shareCase}>{modal === "submit" ? "Submit" : "Share"}</Btn></div>
         </Modal>
       )}
-      {toast && <div role="status" className="fixed bottom-5 left-1/2 z-[60] -translate-x-1/2 rounded-lg bg-slate-900 px-4 py-2.5 text-sm font-medium text-white shadow-lg">{toast}</div>}
+
+      {/* MapLibre Modal for Pilots */}
+      {mapModal && (
+        <MapModal
+          isOpen={true}
+          onClose={() => setMapModal(null)}
+          title={mapModal.title}
+          subtitle={mapModal.subtitle}
+          center={mapModal.center}
+          zoom={mapModal.zoom}
+          markers={mapModal.markers}
+        />
+      )}
+
+      {toast && <div role="status" className="fixed bottom-5 left-1/2 z-[60] -translate-x-1/2 rounded-lg bg-[#1f3d2b] px-4 py-2.5 text-sm font-medium text-white shadow-lg">{toast}</div>}
     </div>
   );
 }

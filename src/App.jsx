@@ -1,4 +1,4 @@
-import { createBrowserRouter, createRoutesFromElements, Route, RouterProvider, Navigate } from "react-router-dom";
+import { createBrowserRouter, createRoutesFromElements, Route, RouterProvider, Navigate, Outlet, useLocation } from "react-router-dom";
 
 import LandingPage from "./pages/LandingPage";
 import StudyDetails from "./pages/StudyDetails";
@@ -9,10 +9,25 @@ import GovAgency from "./pages/GovAgency";
 import Institution from "./pages/Institution";
 import IndustryExpert from "./pages/IndustryExpert";
 import Admin from "./pages/Admin";
+import BhoomiAI from "./components/BhoomiAI";
+import { ROLES } from "./roles";
+
+function RootLayout() {
+  const location = useLocation();
+  const segment = location.pathname.replace(/^\//, "").split("/")[0];
+  const role = ROLES[segment] ? segment : "public";
+
+  return (
+    <>
+      <Outlet />
+      <BhoomiAI key={role} role={role} />
+    </>
+  );
+}
 
 const router = createBrowserRouter(
   createRoutesFromElements(
-    <Route path="/">
+    <Route path="/" element={<RootLayout />}>
       <Route path="" element={<LandingPage />} />
       <Route path="study/:id" element={<StudyDetails />} />
       <Route path="public" element={<PublicUser />} />

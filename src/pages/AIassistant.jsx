@@ -1,9 +1,4 @@
-import React from 'react'
+import BhoomiAI from "../components/BhoomiAI";
 
-const AIassistant = () => {
-  return (
-    <div>AIassistant</div>
-  )
-}
-
-export default AIassistant
+export default BhoomiAI;
+export { BhoomiAI };
